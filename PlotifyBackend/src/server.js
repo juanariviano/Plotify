@@ -9,7 +9,7 @@ import profileRoutes from "./routes/profileRoutes.js";
 import attachUserId from "./middleware/attachUserId.js";
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 
 // cors
 app.use(cors({
