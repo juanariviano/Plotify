@@ -13,9 +13,10 @@ const PORT = process.env.PORT;
 
 // cors
 app.use(cors({
-  origin: 'https://yourplotify.site'
+  origin: 'https://yourplotify.site',
+  credentials: true
 }));
-app.use(cors());
+// app.use(cors());
 app.use(clerkMiddleware());
 
 // karena berkaitan dgn autentikasi maka harus pake raw data (express.raw)
