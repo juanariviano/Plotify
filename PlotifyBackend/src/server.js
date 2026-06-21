@@ -11,9 +11,9 @@ import attachUserId from "./middleware/attachUserId.js";
 const app = express();
 const PORT = process.env.PORT;
 
-// 
+// cors
 app.use(cors({
-  origin: 'yourplotify.vercel.app'
+  origin: 'https://yourplotify.vercel.app'
 }));
 app.use(cors());
 app.use(clerkMiddleware());
