@@ -13,7 +13,7 @@ const PORT = process.env.PORT;
 
 // cors
 app.use(cors({
-  origin: 'https://yourplotify.vercel.app'
+  origin: 'https://yourplotify.site'
 }));
 app.use(cors());
 app.use(clerkMiddleware());
