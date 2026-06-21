@@ -21,8 +21,6 @@ const VerifySignup = () => {
   const method = sessionStorage.getItem("signup_method");
   const [checkingUser, setCheckingUser] = useState(method === "oauth");
 
-  console.log("component rendered"); 
-
   useEffect(() => {
     console.log("!");
     if (!isLoaded || !user?.id) return;
@@ -31,7 +29,6 @@ const VerifySignup = () => {
     const checkUser = async () => {
       try {
         const res = await getUserData(user.id);
-        console.log("res:", res);
 
         if (res.fullname && res.username) {
           navigate("/", { replace: true });
