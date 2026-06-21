@@ -7,7 +7,7 @@ const Item = ({ page, data }: ItemsProps) => {
     (item: Media) => item.is_completed === false,
   );
   const hasData = data.length > 0;
-  console.log("data", hasData)
+  // console.log("data", hasData)
 
   if (!hasData) {
   return (
