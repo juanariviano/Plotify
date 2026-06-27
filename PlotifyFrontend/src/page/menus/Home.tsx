@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useRef } from "react";
 import Footer from "../../components/ui/Footer";
 import Navbar from "../../components/ui/Navbar";
@@ -6,6 +7,9 @@ import "../../styles/animations.css";
 
 const Home = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { isSignedIn } = useAuth();
+
+  const authPath = (path: string) => (isSignedIn ? path : "/signin");
 
   useEffect(() => {
     const root = containerRef.current;
@@ -55,7 +59,7 @@ const Home = () => {
                 a quiet notebook for the shows you watch and the books you read. log your last
                 episode, your last page, and pick up exactly where you stopped.
               </p>
-              <Link to="/screen">
+              <Link to={authPath("/screen")}>
                 <button className="cursor-pointer border px-6 py-4 transition-all duration-500 ease-in-out hover:bg-black hover:text-white active:scale-[0.98]">
                   save your progress
                 </button>
@@ -235,12 +239,12 @@ const Home = () => {
                 head to screen or read and log what you are watching tonight.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
-                <Link to="/screen">
+                <Link to={authPath("/screen")}>
                   <button className="cursor-pointer border px-6 py-4 transition-all duration-500 ease-in-out hover:bg-black hover:text-white active:scale-[0.98]">
                     go to screen
                   </button>
                 </Link>
-                <Link to="/read">
+                <Link to={authPath("/read")}>
                   <button className="cursor-pointer border px-6 py-4 transition-all duration-500 ease-in-out hover:bg-black hover:text-white active:scale-[0.98]">
                     go to read
                   </button>

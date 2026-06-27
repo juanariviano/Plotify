@@ -260,5 +260,173 @@
 .field-error {
   margin-top: 0.25rem;
   font-size: 0.875rem;
-  color: #ef4444;
+  color: #9f2f2d;
+}
+
+/* card detail page */
+.card-detail-badge {
+  display: inline-block;
+  border: 1px solid #eaeaea;
+  background: rgb(247, 246, 243);
+  padding: 0.25rem 0.75rem;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(0.707 0.022 261.325);
+}
+
+.card-detail-badge--type {
+  background: rgb(247, 246, 243);
+  border-color: #eaeaea;
+  color: oklch(0.707 0.022 261.325);
+}
+
+.card-detail-badge--completed {
+  background: #edf3ec;
+  border-color: rgba(52, 101, 56, 0.12);
+  color: #346538;
+}
+
+.card-detail-badge--editing {
+  background: rgb(247, 246, 243);
+  border-color: #eaeaea;
+  color: oklch(0.707 0.022 261.325);
+}
+
+.card-detail-title {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.card-category-pill {
+  display: inline-block;
+  background: rgb(247, 246, 243);
+  border: 1px solid #eaeaea;
+  padding: 0.2rem 0.65rem;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: oklch(0.707 0.022 261.325);
+}
+
+.card-meta-panel {
+  border: 1px solid #eaeaea;
+  background: #f9f9f8;
+  padding: 0 1.25rem;
+}
+
+.card-thumbnail-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 17, 17, 0.45);
+  color: #ffffff;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.landing-card:hover .card-thumbnail-overlay,
+.landing-card:focus-within .card-thumbnail-overlay {
+  opacity: 1;
+}
+
+.card-thumbnail-img {
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-card:hover .card-thumbnail-img {
+  transform: scale(1.02);
+}
+
+.action-btn-primary {
+  cursor: pointer;
+  border: 1px solid #111111;
+  background: #111111;
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  transition:
+    background 200ms ease,
+    transform 120ms ease;
+}
+
+.action-btn-primary:hover {
+  background: #333333;
+  border-color: #333333;
+}
+
+.action-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.action-btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.modal-panel-enter {
+  animation: modalPanelEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalPanelEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-edit-section {
+  border-top: 1px solid #eaeaea;
+  padding-top: 1.25rem;
+}
+
+.card-content-stagger > * {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 80ms;
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 140ms;
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 200ms;
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(4) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 260ms;
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(5) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 320ms;
+}
+
+.reveal.is-visible .card-content-stagger > *:nth-child(6) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 380ms;
 }

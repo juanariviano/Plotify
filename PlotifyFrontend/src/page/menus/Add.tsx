@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createMedia, uploadThumbnail } from "../../services/media.service";
 import Footer from "../../components/ui/Footer";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import "../../styles/animations.css";
 
 const Add = () => {
@@ -137,40 +138,49 @@ const Add = () => {
     <div className="relative min-h-screen bg-white lowercase text-[#111111]">
       <div className="landing-ambient" aria-hidden="true" />
 
-      <div ref={containerRef} className="relative z-10">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-center gap-12 px-6 py-16 sm:px-10 lg:gap-20 lg:py-24">
-          <div className="reveal w-80 shrink-0">
-            <input
-              type="file"
-              accept="image/*"
-              id="fileInput"
-              hidden
-              onChange={handleImageChange}
-            />
-            <label
-              htmlFor="fileInput"
-              className="landing-card relative block h-120 w-80 cursor-pointer overflow-hidden bg-[#f7f6f3]"
-            >
-              {preview ? (
-                <>
-                  <img
-                    src={preview}
-                    alt="preview"
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 transition-opacity duration-300 hover:opacity-100">
-                    change image
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                  upload image
-                </div>
-              )}
-            </label>
-          </div>
+      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-8 sm:px-10 lg:py-12">
+          <div className="reveal flex flex-wrap items-start justify-center gap-12 lg:mx-auto lg:w-auto lg:items-start lg:gap-20">
+            <div className="flex w-80 shrink-0 flex-col items-start gap-4">
+              <Breadcrumbs
+                className="mb-0 w-full"
+                items={[
+                  { label: item === "screen" ? "screen" : "read", to: `/${item}` },
+                  { label: item === "screen" ? "add new screen" : "add new read" },
+                ]}
+              />
 
-          <div className="reveal flex w-full max-w-[350px] flex-col justify-center">
+              <input
+                type="file"
+                accept="image/*"
+                id="fileInput"
+                hidden
+                onChange={handleImageChange}
+              />
+              <label
+                htmlFor="fileInput"
+                className="landing-card relative block h-120 w-full cursor-pointer overflow-hidden bg-[#f7f6f3]"
+              >
+                {preview ? (
+                  <>
+                    <img
+                      src={preview}
+                      alt="preview"
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 transition-opacity duration-300 hover:opacity-100">
+                      change image
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                    upload image
+                  </div>
+                )}
+              </label>
+            </div>
+
+            <div className="flex min-w-[320px] max-w-md shrink-0 flex-col justify-center self-center lg:min-w-[400px]">
             <span className="mb-8 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
               {item === "screen" ? "add new screen" : "add new read"}
             </span>
@@ -243,21 +253,22 @@ const Add = () => {
               </div>
             </div>
 
-            <div className="mt-10 flex gap-3">
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="action-btn disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? "saving..." : "save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="action-btn"
-              >
-                cancel
-              </button>
+              <div className="mt-10 flex gap-3">
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="action-btn disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? "saving..." : "save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="action-btn"
+                >
+                  cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
