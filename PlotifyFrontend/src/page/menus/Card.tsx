@@ -13,6 +13,7 @@ import {
 } from "../../services/media.service";
 import LoadingScreen from "../../components/ui/LoadingScreen";
 import Footer from "../../components/ui/Footer";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import { useQueryClient } from "@tanstack/react-query";
 import "../../styles/animations.css";
 
@@ -415,20 +416,29 @@ const Edit = () => {
     <>
       <title>more info</title>
 
-      <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+      <div className="relative min-h-screen bg-[#fbfafa] lowercase text-[#111111]">
         <div className="landing-ambient" aria-hidden="true" />
 
-        <div ref={containerRef} className="relative z-10">
+        <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
       {media.map((item: Media) => {
         if (item.id === parseInt(id!))
           return (
-            <div className="reveal mx-auto flex max-w-5xl flex-wrap items-start justify-center gap-12 px-6 py-16 sm:px-10 lg:gap-20 lg:py-20">
+            <div
+              key={item.id}
+              className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-10 sm:px-10 lg:py-16"
+            >
+                <div className="reveal grid w-full items-start gap-10 lg:grid-cols-[minmax(280px,320px)_1fr] lg:gap-16">
               {/* confirmation pop up */}
               {isDelete && (
                 <div className="modal-overlay">
-                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
-                    <p>are you sure to delete?</p>
-                    <p className="text-xs text-gray-400">
+                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
+                    <p
+                      className="card-detail-title text-xl"
+                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                    >
+                      are you sure to delete?
+                    </p>
+                    <p className="text-xs leading-relaxed text-[#787774]">
                       this cannot be undone.
                     </p>
 
@@ -454,17 +464,22 @@ const Edit = () => {
 
               {isMarkCompleted && (
                 <div className="modal-overlay">
-                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
-                    <p>mark as completed?</p>
+                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
+                    <p
+                      className="card-detail-title text-xl"
+                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                    >
+                      mark as completed?
+                    </p>
 
-                    <p>
+                    <p className="text-sm text-[#787774]">
                       add rating:{" "}
                       <input
                         type="string"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         placeholder="0-5"
-                        className={`field-input mt-2 w-[70px] ${isError ? "border-red-500" : ""}`}
+                        className={`field-input mt-2 w-[70px] text-center ${isError ? "border-[#9f2f2d]" : ""}`}
                       />
                     </p>
 
@@ -492,8 +507,13 @@ const Edit = () => {
 
               {showRatingModal && (
                 <div className="modal-overlay">
-                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
-                    <p className="mb-3">give rating (0 - 5)</p>
+                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
+                    <p
+                      className="card-detail-title mb-3 text-xl"
+                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                    >
+                      give rating (0 - 5)
+                    </p>
 
                     <input
                       type="text"
@@ -509,9 +529,9 @@ const Edit = () => {
                           },
                         }));
                       }}
-                      className={`field-input w-[120px] ${
+                      className={`field-input w-[120px] text-center ${
                         errors[selectedItem?.id || 0]?.rating
-                          ? "border-red-500"
+                          ? "border-[#9f2f2d]"
                           : ""
                       }`}
                     />
@@ -529,7 +549,7 @@ const Edit = () => {
                       }
                     `}
                     >
-                      <p className="text-red-500 text-sm text-right">
+                      <p className="text-sm text-[#9f2f2d]">
                         {errors[selectedItem?.id || 0]?.rating}
                       </p>
                     </div>
@@ -537,7 +557,7 @@ const Edit = () => {
                     <div className="flex gap-3">
                       <button
                         type="button"
-                        className="action-btn"
+                        className="action-btn-primary"
                         onClick={confirmComplete}
                       >
                         {loadingComplete ? "saving..." : "yes"}
@@ -557,13 +577,18 @@ const Edit = () => {
 
               {showUncompleteModal && (
                 <div className="modal-overlay">
-                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
-                    <p className="mb-5">set this item back to uncompleted?</p>
+                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
+                    <p
+                      className="card-detail-title mb-3 text-xl"
+                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                    >
+                      set this item back to uncompleted?
+                    </p>
 
                     <div className="flex gap-3">
                       <button
                         type="button"
-                        className={`action-btn ${
+                        className={`action-btn-primary ${
                           uncompleteLoading
                             ? "pointer-events-none opacity-50"
                             : ""
@@ -594,23 +619,34 @@ const Edit = () => {
               )}
 
               {isEdit ? (
-                <div className="flex w-80 shrink-0 flex-col items-center gap-4">
+                <div className="flex w-full flex-col items-start gap-5">
+                  <Breadcrumbs
+                    className="mb-0 w-full"
+                    items={[
+                      { label: item.type, to: `/${item.type}` },
+                      { label: item.title },
+                      { label: "editing" },
+                    ]}
+                  />
+
                   <div className="landing-card group relative w-full overflow-hidden bg-[#f7f6f3]">
-                    <img
-                      src={
-                        imageFile
-                          ? URL.createObjectURL(imageFile)
-                          : deleteThumbnail
-                            ? "default-thumbnail.png"
-                            : item.image_url || "default-thumbnail.png"
-                      }
-                      alt="thumbnail"
-                      className="h-120 w-full object-cover"
-                    />
+                    <div className="aspect-[3/4] overflow-hidden">
+                      <img
+                        src={
+                          imageFile
+                            ? URL.createObjectURL(imageFile)
+                            : deleteThumbnail
+                              ? "default-thumbnail.png"
+                              : item.image_url || "default-thumbnail.png"
+                        }
+                        alt="thumbnail"
+                        className="card-thumbnail-img h-full w-full object-cover"
+                      />
+                    </div>
 
                     <label
                       htmlFor="thumbnail-upload"
-                      className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      className="card-thumbnail-overlay cursor-pointer"
                     >
                       {item.image_url ? "change thumbnail" : "upload thumbnail"}
                     </label>
@@ -659,289 +695,339 @@ const Edit = () => {
                   ) : null}
                 </div>
               ) : (
-                <div className="landing-card overflow-hidden bg-[#f7f6f3]">
-                  <img
-                    src={
-                      item.image_url ? item.image_url : "default-thumbnail.png"
-                    }
-                    alt={item.title}
-                    className="h-120 w-80 object-cover"
+                <div className="flex w-full flex-col items-start gap-5">
+                  <Breadcrumbs
+                    className="mb-0 w-full"
+                    items={[
+                      { label: item.type, to: `/${item.type}` },
+                      { label: item.title },
+                    ]}
                   />
+
+                  <div className="landing-card w-full overflow-hidden bg-[#f7f6f3]">
+                    <div className="aspect-[3/4] overflow-hidden">
+                      <img
+                        src={
+                          item.image_url ? item.image_url : "default-thumbnail.png"
+                        }
+                        alt={item.title}
+                        className="card-thumbnail-img h-full w-full object-cover"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="flex min-w-[320px] max-w-md flex-col justify-center lg:min-w-[400px]">
-                {isEdit ? (
-                  <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-                    editing
-                  </span>
+              <div className="flex w-full min-w-0 flex-col items-start justify-center lg:pt-2">
+                {!isEdit ? (
+                  <div className="card-content-stagger w-full">
+                    <div className="mb-6 flex flex-wrap items-center gap-2">
+                      <span className="card-detail-badge card-detail-badge--type">
+                        {item.type}
+                      </span>
+                      {item.is_completed && (
+                        <span className="card-detail-badge card-detail-badge--completed">
+                          completed
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {item.category.length > 0 ? (
+                        item.category.map((cat) => (
+                          <span key={cat} className="card-category-pill">
+                            {cat}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="font-mono text-xs text-[#787774]">
+                          no category
+                        </span>
+                      )}
+                    </div>
+
+                    <h1
+                      className="card-detail-title mb-5 text-[2rem] sm:text-[2.5rem]"
+                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                    >
+                      {item.title}
+                    </h1>
+
+                    <p className="mb-8 max-w-lg leading-[1.6] text-[#787774]">
+                      {item.description || "no description added"}
+                    </p>
+
+                    <div className="card-meta-panel w-full">
+                      <div className="detail-meta-row">
+                        <span className="text-sm text-[#787774]">
+                          {item.type === "read" ? "where to read" : "where to watch"}
+                        </span>
+                        <span className="font-mono text-sm">{item.source || "—"}</span>
+                      </div>
+
+                      <div className="detail-meta-row">
+                        <span className="text-sm text-[#787774]">
+                          {item.is_completed ? "total" : "last"}{" "}
+                          {item.type === "read" ? "page" : "episode"}
+                        </span>
+                        <span className="font-mono text-sm">{item.last_episode}</span>
+                      </div>
+
+                      {item.is_completed && (
+                        <div className="detail-meta-row border-b-0">
+                          <span className="text-sm text-[#787774]">rating</span>
+                          <span className="bg-[#fbf3db] px-2 py-0.5 font-mono text-sm text-[#956400]">
+                            {item.rating}/5
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      className="back-link mb-6 w-fit"
-                      onClick={() => navigate(-1)}
-                    >
-                      back to prev tab
-                    </button>
-
-                    <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-                      {item.type}
-                    </span>
-                  </>
-                )}
-
-                {isEdit ? (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="whitespace-nowrap text-sm text-gray-400">category:</span>
-                    <input
-                      type="text"
-                      value={
-                        categoryInput[item.id] ??
-                        (editData[item.id]?.category || []).join(", ")
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-
-                        setCategoryInput((prev) => ({
-                          ...prev,
-                          [item.id]: val,
-                        }));
-
-                        setEditData((prev) => ({
-                          ...prev,
-                          [item.id]: {
-                            ...prev[item.id],
-                            category: val
-                              .split(",")
-                              .map((c) => c.trim())
-                              .filter(Boolean),
-                          },
-                        }));
-                      }}
-                      className="field-input"
-                    />
-                  </div>
-                ) : (
-                  <p className="font-mono text-sm text-gray-400">
-                    {item.category.join(", ") || "no category"}
-                  </p>
-                )}
-
-                {isEdit ? (
-                  <div className="mt-3 w-full">
-                    <span className="mb-2 block text-sm text-gray-400">title:</span>
-                    <input
-                      type="text"
-                      value={editData[item.id]?.title || ""}
-                      onChange={(e) =>
-                        setEditData((prev) => ({
-                          ...prev,
-                          [item.id]: {
-                            ...(prev[item.id] || {}),
-                            title: e.target.value,
-                          },
-                        }))
-                      }
-                      className={`field-input ${
-                        errors[item.id]?.title ? "border-red-500" : ""
-                      }`}
-                    />
-                    {errors[item.id]?.title && (
-                      <p className="field-error">{errors[item.id]?.title}</p>
-                    )}
-                  </div>
-                ) : (
-                  <h1 className="text-2xl font-bold sm:text-[26px]">{item.title}</h1>
-                )}
-
-                {isEdit ? (
-                  <div className="mt-3">
-                    <span className="mb-2 block text-sm text-gray-400">description:</span>
-                    <textarea
-                      value={editData[item.id]?.description || ""}
-                      onChange={(e) =>
-                        setEditData((prev) => ({
-                          ...prev,
-                          [item.id]: {
-                            ...prev[item.id],
-                            description: e.target.value,
-                          },
-                        }))
-                      }
-                      className="field-input min-h-[100px] resize-none"
-                    />
-                  </div>
-                ) : (
-                  <p className="mb-5 mt-4 leading-relaxed text-gray-400">
-                    {item.description || "no description added"}
-                  </p>
-                )}
-
-                {item && !isEdit ? (
-                  <div className="mt-6 border-t border-[#eaeaea]">
-                    <div className="detail-meta-row">
-                      <span className="text-sm text-gray-400">
-                        {item.type === "read" ? "where to read" : "where to watch"}
+                    <div className="mb-6 flex flex-wrap items-center gap-2">
+                      <span className="card-detail-badge card-detail-badge--type">
+                        {item.type}
                       </span>
-                      <span className="font-mono text-sm">{item.source || "—"}</span>
+                      <span className="card-detail-badge card-detail-badge--editing">
+                        editing
+                      </span>
                     </div>
 
-                    <div className="detail-meta-row">
-                      <span className="text-sm text-gray-400">
-                        {item.is_completed ? "total" : "last"}{" "}
-                        {item.type === "read" ? "page" : "episode"}
-                      </span>
-                      <span className="font-mono text-sm">{item.last_episode}</span>
-                    </div>
-
-                    {item.is_completed && (
-                      <div className="detail-meta-row">
-                        <span className="text-sm text-gray-400">rating</span>
-                        <span className="font-mono text-sm">{item.rating}/5</span>
-                      </div>
-                    )}
-                  </div>
-                ) : item && isEdit ? (
-                  <div className="mt-4 space-y-3">
+                  <div className="flex w-full flex-col gap-5">
                     <div>
-                      <span className="mb-2 block text-sm text-gray-400">
-                        {item.type === "read" ? "where to read" : "where to watch"}
+                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                        category
                       </span>
                       <input
                         type="text"
-                        value={editData[item.id]?.source || ""}
-                        onChange={(e) =>
+                        value={
+                          categoryInput[item.id] ??
+                          (editData[item.id]?.category || []).join(", ")
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+
+                          setCategoryInput((prev) => ({
+                            ...prev,
+                            [item.id]: val,
+                          }));
+
                           setEditData((prev) => ({
                             ...prev,
                             [item.id]: {
                               ...prev[item.id],
-                              source: e.target.value,
+                              category: val
+                                .split(",")
+                                .map((c) => c.trim())
+                                .filter(Boolean),
                             },
-                          }))
-                        }
+                          }));
+                        }}
                         className="field-input"
+                        placeholder="comma separated"
                       />
                     </div>
 
                     <div>
-                      <span className="mb-2 block text-sm text-gray-400">
-                        {item.is_completed ? "total" : "last"}{" "}
-                        {item.type === "read" ? "page" : "episode"}
+                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                        title
                       </span>
                       <input
                         type="text"
-                        value={editData[item.id]?.last_episode ?? ""}
+                        value={editData[item.id]?.title || ""}
                         onChange={(e) =>
                           setEditData((prev) => ({
                             ...prev,
                             [item.id]: {
                               ...(prev[item.id] || {}),
-                              last_episode:
-                                e.target.value === "" ? null : e.target.value,
+                              title: e.target.value,
                             },
                           }))
                         }
-                        className={`field-input max-w-[160px] ${
-                          errors[item.id]?.lastEpisode ? "border-red-500" : ""
+                        className={`field-input ${
+                          errors[item.id]?.title ? "border-[#9f2f2d]" : ""
                         }`}
                       />
-                      {errors[item.id]?.lastEpisode && (
-                        <p className="field-error">{errors[item.id]?.lastEpisode}</p>
+                      {errors[item.id]?.title && (
+                        <p className="field-error">{errors[item.id]?.title}</p>
                       )}
                     </div>
 
-                    {item.is_completed && (
+                    <div>
+                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                        description
+                      </span>
+                      <textarea
+                        value={editData[item.id]?.description || ""}
+                        onChange={(e) =>
+                          setEditData((prev) => ({
+                            ...prev,
+                            [item.id]: {
+                              ...prev[item.id],
+                              description: e.target.value,
+                            },
+                          }))
+                        }
+                        className="field-input min-h-[100px] resize-none"
+                      />
+                    </div>
+
+                    <div className="card-edit-section flex flex-col gap-5">
                       <div>
-                        <span className="mb-2 block text-sm text-gray-400">rating</span>
+                        <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                          {item.type === "read" ? "where to read" : "where to watch"}
+                        </span>
                         <input
                           type="text"
-                          value={editData[item.id]?.rating ?? ""}
+                          value={editData[item.id]?.source || ""}
+                          onChange={(e) =>
+                            setEditData((prev) => ({
+                              ...prev,
+                              [item.id]: {
+                                ...prev[item.id],
+                                source: e.target.value,
+                              },
+                            }))
+                          }
+                          className="field-input"
+                        />
+                      </div>
+
+                      <div>
+                        <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                          {item.is_completed ? "total" : "last"}{" "}
+                          {item.type === "read" ? "page" : "episode"}
+                        </span>
+                        <input
+                          type="text"
+                          value={editData[item.id]?.last_episode ?? ""}
                           onChange={(e) =>
                             setEditData((prev) => ({
                               ...prev,
                               [item.id]: {
                                 ...(prev[item.id] || {}),
-                                rating:
+                                last_episode:
                                   e.target.value === "" ? null : e.target.value,
                               },
                             }))
                           }
                           className={`field-input max-w-[160px] ${
-                            errors[item.id]?.rating ? "border-red-500" : ""
+                            errors[item.id]?.lastEpisode ? "border-[#9f2f2d]" : ""
                           }`}
                         />
-                        {errors[item.id]?.rating && (
-                          <p className="field-error">{errors[item.id]?.rating}</p>
+                        {errors[item.id]?.lastEpisode && (
+                          <p className="field-error">{errors[item.id]?.lastEpisode}</p>
                         )}
                       </div>
-                    )}
+
+                      {item.is_completed && (
+                        <div>
+                          <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
+                            rating
+                          </span>
+                          <input
+                            type="text"
+                            value={editData[item.id]?.rating ?? ""}
+                            onChange={(e) =>
+                              setEditData((prev) => ({
+                                ...prev,
+                                [item.id]: {
+                                  ...(prev[item.id] || {}),
+                                  rating:
+                                    e.target.value === "" ? null : e.target.value,
+                                },
+                              }))
+                            }
+                            className={`field-input max-w-[160px] ${
+                              errors[item.id]?.rating ? "border-[#9f2f2d]" : ""
+                            }`}
+                          />
+                          {errors[item.id]?.rating && (
+                            <p className="field-error">{errors[item.id]?.rating}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : null}
+                  </>
+                )}
 
                 <div
                   key={isEdit ? "edit-actions" : "view-actions"}
-                  className="card-actions-fade mt-10 flex flex-col gap-3"
+                  className="card-actions-fade mt-10 flex w-full flex-col gap-3 border-t border-[#eaeaea] pt-8"
                 >
                   {isEdit ? (
-                    <button
-                      type="button"
-                      className="action-btn-danger w-fit"
-                      onClick={() => setIsDelete(true)}
-                    >
-                      delete
-                    </button>
-                  ) : item.is_completed ? (
-                    <button
-                      type="button"
-                      className="action-btn w-fit"
-                      onClick={() => openUncompleteModal(item)}
-                    >
-                      set back to uncomplete
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="action-btn w-fit"
-                      onClick={() => openCompleteModal(item)}
-                    >
-                      mark as complete
-                    </button>
-                  )}
-
-                  {isEdit ? (
-                    <div className="flex gap-3">
+                    <>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="action-btn-primary"
+                          onClick={() => handleSave(item)}
+                        >
+                          {loading ? "saving..." : "save"}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => {
+                            setIsEdit(false);
+                            setDeleteThumbnail(false);
+                            setImageFile(null);
+                          }}
+                        >
+                          cancel
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        className="action-btn"
-                        onClick={() => handleSave(item)}
+                        className="action-btn-danger w-fit"
+                        onClick={() => setIsDelete(true)}
                       >
-                        {loading ? "saving..." : "save"}
+                        delete
                       </button>
-
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          setIsEdit(false);
-                          setDeleteThumbnail(false);
-                          setImageFile(null);
-                        }}
-                      >
-                        cancel
-                      </button>
-                    </div>
+                    </>
                   ) : (
-                    <button
-                      type="button"
-                      className="action-btn w-fit"
-                      onClick={() => setIsEdit(true)}
-                    >
-                      edit
-                    </button>
+                    <>
+                      {item.is_completed ? (
+                        <button
+                          type="button"
+                          className="action-btn-primary w-fit"
+                          onClick={() => openUncompleteModal(item)}
+                        >
+                          set back to uncomplete
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="action-btn-primary w-fit"
+                          onClick={() => openCompleteModal(item)}
+                        >
+                          mark as complete
+                        </button>
+                      )}
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => navigate(-1)}
+                        >
+                          back
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => setIsEdit(true)}
+                        >
+                          edit
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
+            </div>
             </div>
           );
       })}

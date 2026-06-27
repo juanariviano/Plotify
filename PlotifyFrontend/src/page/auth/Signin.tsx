@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useSignIn } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
@@ -7,6 +7,9 @@ import "../../styles/animations.css";
 
 const Signin = () => {
   const page: string = window.location.pathname;
+  const location = useLocation();
+  const redirectTo =
+    typeof location.state?.from === "string" ? location.state.from : "/";
   const containerRef = useRef<HTMLDivElement>(null);
   const { signIn, setActive, isLoaded } = useSignIn();
 
@@ -44,6 +47,7 @@ const Signin = () => {
 
     try {
       setLoading(true);
+      setError("");
       const result = await signIn.create({
         identifier: email,
         password: password,
@@ -54,7 +58,7 @@ const Signin = () => {
           session: result.createdSessionId,
         });
 
-        window.location.href = "/";
+        window.location.href = redirectTo;
       }
 
       if (result.status === "needs_first_factor") {
@@ -94,11 +98,30 @@ const Signin = () => {
         setFactorType("second");
         setStep("otp");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.log(err);
-      setLoading(false);
-      await signIn.reload();
-      setError("invalid username or password");
+
+      if (typeof err === "object" && err !== null && "errors" in err) {
+        const clerkError = err as {
+          errors?: { longMessage?: string; message?: string }[];
+        };
+
+        setError(
+          (
+            clerkError.errors?.[0]?.longMessage ||
+            clerkError.errors?.[0]?.message ||
+            "invalid username or password"
+          ).toLowerCase(),
+        );
+      } else {
+        setError("invalid username or password");
+      }
+
+      try {
+        await signIn.reload();
+      } catch (reloadErr) {
+        console.log(reloadErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -120,7 +143,7 @@ const Signin = () => {
           session: result.createdSessionId,
         });
 
-        window.location.href = "/";
+        window.location.href = redirectTo;
       }
     } catch (err) {
       console.log(err);
@@ -193,7 +216,11 @@ const Signin = () => {
                   type="email"
                   className="field-input"
                   placeholder="email"
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError("");
+                  }}
                 />
 
                 <div className="relative w-full">
@@ -201,7 +228,11 @@ const Signin = () => {
                     type={showPassword ? "text" : "password"}
                     className="field-input pr-12"
                     placeholder="password"
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
                   />
                   <button
                     type="button"

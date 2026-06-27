@@ -57,15 +57,9 @@ function App() {
           </PublicRoute>
         }
       />
+      // public
+      <Route index element={<Home />} />
       // protected
-      <Route
-        index
-        element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/screen"
         element={
