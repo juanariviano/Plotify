@@ -1,11 +1,14 @@
 import { useSignIn } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
 import LoadingScreen from "../../components/ui/LoadingScreen";
+import Footer from "../../components/ui/Footer";
+import "../../styles/animations.css";
 
 const Reset = () => {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { isLoaded, signIn, setActive } = useSignIn();
 
@@ -19,6 +22,26 @@ const Reset = () => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || loading) return;
+
+    const elements = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [loading, step]);
 
   const handleResetPassword = async () => {
     if (!isLoaded || loading) return;
@@ -52,104 +75,119 @@ const Reset = () => {
       console.log(err);
       setLoading(false);
 
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "errors" in err
-      ) {
+      if (typeof err === "object" && err !== null && "errors" in err) {
         const clerkError = err as {
           errors?: { longMessage?: string }[];
         };
 
-        setError(
-          clerkError.errors?.[0]?.longMessage ||
-          "something went wrong"
-        );
+        setError(clerkError.errors?.[0]?.longMessage || "something went wrong");
       } else {
         setError("something went wrong");
       }
     }
   };
 
-  if(loading){
-    return <LoadingScreen />
+  if (loading) {
+    return <LoadingScreen />;
   }
 
   return (
-    <div className="flex items-center justify-center h-[100vh]">
-      <title>reset password</title>
-      <div className="flex flex-col gap-3">
-        <h1 className="font-bold text-[26px]">plotify</h1>
+    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+      <div className="landing-ambient" aria-hidden="true" />
 
-        {step === 1 ? (
-          <>
-            <input
-              type="text"
-              placeholder="verification code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="border py-4 px-6 w-[350px]"
-            />
+      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
+        <title>reset password</title>
 
-            <span
-              className="underline cursor-pointer mt-3"
-              onClick={() => setStep(2)}
-            >
-              continue
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10">
+          <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
+            <span className="mb-2 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+              {step === 1 ? "verification" : "new password"}
             </span>
-          </>
-        ) : (
-          <>
-            <div className="relative w-[350px]">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                className="border py-4 px-6 w-full pr-12"
-                placeholder="new password"
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-              >
-                {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-            </div>
 
-            <div className="relative w-[350px]">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                value={confirmPassword}
-                className="border py-4 px-6 w-full pr-12"
-                placeholder="new password"
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-              >
-                {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-            </div>
+            <h1 className="mb-4 text-2xl font-bold sm:text-[26px]">plotify</h1>
 
-            {error && (
-                  <p className="text-red-500">
-                    {error}
-                  </p>
-                )}
+            {step === 1 ? (
+              <>
+                <p className="mb-2 text-sm text-gray-400">
+                  enter the code from your email
+                </p>
 
-            <span
-              className="underline cursor-pointer mt-3"
-              onClick={handleResetPassword}
-            >
-              reset password
-            </span>
-          </>
-        )}
+                <input
+                  type="text"
+                  placeholder="verification code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="field-input"
+                />
 
-        
+                <button
+                  type="button"
+                  className="action-btn mt-3 w-fit"
+                  onClick={() => setStep(2)}
+                >
+                  continue
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    className="field-input pr-12"
+                    placeholder="new password"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
+                  >
+                    {showPassword ? <Eye size={15} /> : <EyeOff size={15} />}
+                  </button>
+                </div>
+
+                <div className="relative w-full">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    className="field-input pr-12"
+                    placeholder="confirm password"
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
+                  >
+                    {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
+                  </button>
+                </div>
+
+                {error && <p className="field-error">{error}</p>}
+
+                <div className="mt-3 flex gap-3">
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => setStep(1)}
+                  >
+                    back
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={handleResetPassword}
+                  >
+                    reset password
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <Footer />
       </div>
     </div>
   );

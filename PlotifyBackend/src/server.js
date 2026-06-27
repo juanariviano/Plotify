@@ -13,7 +13,10 @@ const PORT = process.env.PORT || 8080;
 
 // cors
 app.use(cors({
-  origin: 'https://yourplotify.site',
+  origin: [
+    'https://yourplotify.site',    // production
+    'http://localhost:5173'         // development
+  ],
   credentials: true
 }));
 // app.use(cors());
