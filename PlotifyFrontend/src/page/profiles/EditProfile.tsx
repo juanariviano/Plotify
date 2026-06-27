@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   getUserData,
@@ -11,9 +11,12 @@ import {
 } from "../../services/profile.service";
 import LoadingScreen from "../../components/ui/LoadingScreen";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Footer from "../../components/ui/Footer";
+import "../../styles/animations.css";
 
 const EditProfile = () => {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
@@ -31,7 +34,6 @@ const EditProfile = () => {
   const [confirmationDelete, setConfirmationDelete] = useState(false);
   const [email, setEmail] = useState("");
   const [oldEmail, setOldEmail] = useState("");
-  // const [initialized, setInitialized] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const hasPassword = user?.passwordEnabled;
@@ -67,14 +69,33 @@ const EditProfile = () => {
     setOldEmail(profile.email);
   }, [profile]);
 
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || pageLoading) return;
+
+    const elements = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [pageLoading, emailVerification]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const selected = e.target.files?.[0];
     if (!selected) return;
 
     setFile(selected);
-    setPreview(URL.createObjectURL(selected)); // buat preview
-    // URL.createObjectURL : buat bikin alamat url sementara untk <img>
+    setPreview(URL.createObjectURL(selected));
   };
 
   const [editLoading, setEditLoading] = useState(false);
@@ -94,14 +115,11 @@ const EditProfile = () => {
       return;
     }
 
-    // cara ambil token di clerk
     const token = await getToken();
 
-    // cara kirim file ke be (dokumen, gambar, file) -> pake formData
     const formData = new FormData();
 
     if (file) {
-      // key, isi nilai/value
       formData.append("profile_image", file);
     }
 
@@ -214,190 +232,206 @@ const EditProfile = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-[100vh]">
+    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
       {deleteLoading && <LoadingScreen />}
 
       {confirmationDelete && (
-        <div className="fixed inset-0 z-50 h-[100vh] w-[100vw] flex flex-col justify-center items-center bg-gray-100/50 backdrop-blur">
-          <div className="flex flex-col justify-center items-center bg-white w-[350px] h-[160px]">
+        <div className="modal-overlay">
+          <div className="modal-panel flex flex-col items-center gap-4 text-center">
             <p>are you sure to delete your account?</p>
+            <p className="text-xs text-gray-400">
+              this permanently removes your profile and all saved items.
+            </p>
 
-            <div className="flex gap-7 mt-7">
-              <span
-                className="cursor-pointer underline"
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="action-btn-danger"
                 onClick={handleDeleteAccount}
               >
                 yes
-              </span>
-              <span
-                className="cursor-pointer underline"
+              </button>
+              <button
+                type="button"
+                className="action-btn"
                 onClick={() => setConfirmationDelete(false)}
               >
                 no
-              </span>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <title>edit profile</title>
-      <div className="flex flex-col gap-3">
-        {!emailVerification ? (
-          <>
-            <div className="flex flex-col items-center mb-10">
-              <input
-                type="file"
-                accept="image/*"
-                id="fileInput"
-                name="profile_image"
-                hidden
-                onChange={handleFileChange}
-              />
-              <label
-                htmlFor="fileInput"
-                className="relative border h-60 w-60 cursor-pointer overflow-hidden group"
-              >
-                {preview && !error ? (
-                  <img src={preview} className="h-full w-full object-cover" />
-                ) : currImage ? (
-                  delProfilePic ? (
+      <div className="landing-ambient" aria-hidden="true" />
+
+      <div ref={containerRef} className="relative z-10">
+        <title>edit profile</title>
+
+        <div className="mx-auto flex max-w-5xl flex-col items-center px-6 py-16 sm:px-10 lg:py-24">
+          {!emailVerification ? (
+            <>
+              <div className="reveal mb-10 flex flex-col items-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="fileInput"
+                  name="profile_image"
+                  hidden
+                  onChange={handleFileChange}
+                />
+                <label
+                  htmlFor="fileInput"
+                  className="landing-card group relative block h-60 w-60 cursor-pointer overflow-hidden bg-[#f7f6f3]"
+                >
+                  {preview && !error ? (
                     <img
-                      src="default-profile-pic.png"
+                      src={preview}
+                      alt="preview"
                       className="h-full w-full object-cover"
                     />
+                  ) : currImage ? (
+                    delProfilePic ? (
+                      <img
+                        src="default-profile-pic.png"
+                        alt="profile"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={currImage}
+                        alt="profile"
+                        className="h-full w-full object-cover"
+                      />
+                    )
                   ) : (
                     <img
-                      src={currImage}
+                      src="default-profile-pic.png"
+                      alt="profile"
                       className="h-full w-full object-cover"
                     />
-                  )
-                ) : (
-                  <img
-                    src="default-profile-pic.png"
-                    className="h-full w-full object-cover"
-                  />
-                )}
+                  )}
 
-                {/* for hover overlay */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
-                  <p className="text-white text-center px-4">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-4 text-center text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                     {currImage
                       ? delProfilePic
                         ? "upload new profile"
                         : "change profile pic"
                       : "upload new profile"}
-                  </p>
-                </div>
-              </label>
+                  </div>
+                </label>
 
-              {currImage ? (
-                <span
-                  className="mt-3 underline cursor-pointer"
-                  onClick={() => setDelProfilePic(!delProfilePic)}
-                >
-                  {delProfilePic
-                    ? "restore profile pic"
-                    : "delete profile picture"}
-                </span>
-              ) : (
-                ""
-              )}
-
-              {error && <p className="text-red-500 mt-5">{error}</p>}
-            </div>
-
-            <input
-              type="text"
-              className="border py-4 px-6 w-[350px]"
-              placeholder="full name"
-              value={fullname}
-              onChange={(e) => setFullname(e.target.value)}
-            />
-
-            <input
-              type="text"
-              className="border py-4 px-6 w-[350px]"
-              placeholder="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-
-            <div className="relative group w-[350px]">
-              <input
-                type="email"
-                disabled={!hasPassword}
-                className={`border py-4 px-6 w-[350px] ${!hasPassword ? "bg-gray-100 cursor-not-allowed opacity-50" : ""}`}
-                placeholder="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-
-              {/* tooltip pemberitahuan */}
-              {!hasPassword && (
-                <div
-                  className="absolute bottom-[110%] left-1/2 -translate-x-1/2 mb-2 w-max bg-black text-white text-[12px] py-3 px-4 shadow-lg z-50 pointer-events-none 
-                  opacity-0 invisible group-hover:opacity-100 group-hover:visible 
-                  transition-all duration-500 ease-in-out transform translate-y-2 group-hover:translate-y-0"
-                >
-                  signed in using google account, email cannot be changed
-                  {/* Panah kecil di bawah tooltip */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black"></div>
-                </div>
-              )}
-            </div>
-
-            <p className="text-green-400 hidden">
-              verification email was sent! <br /> please check your email.
-            </p>
-
-            <div className="mt-3">
-              {editLoading ? "" : <span
-                className="cursor-pointer underline text-red-500"
-                onClick={() => setConfirmationDelete(true)}
-              >
-                delete account
-              </span>}
-              
-              <div className="flex gap-3 mt-2">
-                {editLoading ? (
-                  ""
-                ) : (
-                  <span
-                    className="underline cursor-pointer"
-                    onClick={() => {
-                      navigate(-1);
-                    }}
+                {currImage ? (
+                  <button
+                    type="button"
+                    className={`mt-4 ${delProfilePic ? "action-btn" : "action-btn-danger"}`}
+                    onClick={() => setDelProfilePic(!delProfilePic)}
                   >
-                    cancel
-                  </span>
+                    {delProfilePic
+                      ? "restore profile pic"
+                      : "delete profile picture"}
+                  </button>
+                ) : (
+                  ""
                 )}
 
-                <span
-                  className={`${editLoading ? "text-gray-300" : "underline cursor-pointer"}`}
-                  onClick={handleUpload}
-                >
-                  {editLoading ? "processing..." : "save"}
-                </span>
+                {error && <p className="field-error mt-5">{error}</p>}
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <input
-              type="text"
-              placeholder="verification code"
-              className="border py-4 px-6 w-[350px]"
-              onChange={(e) => setCode(e.target.value)}
-            />
 
-            <span
-              className="underline mt-3 cursor-pointer"
-              onClick={verifyCode}
-            >
-              verify email
-            </span>
-          </>
-        )}
+              <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
+                <input
+                  type="text"
+                  className="field-input"
+                  placeholder="full name"
+                  value={fullname}
+                  onChange={(e) => setFullname(e.target.value)}
+                />
+
+                <input
+                  type="text"
+                  className="field-input"
+                  placeholder="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+
+                <div className="group relative w-full">
+                  <input
+                    type="email"
+                    disabled={!hasPassword}
+                    className={`field-input ${!hasPassword ? "cursor-not-allowed bg-[#f7f6f3] opacity-60" : ""}`}
+                    placeholder="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+
+                  {!hasPassword && (
+                    <div className="pointer-events-none absolute bottom-[110%] left-0 mb-2 w-max max-w-[280px] border border-[#eaeaea] bg-[#f7f6f3] px-3 py-2 text-xs text-gray-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      signed in using google account, email cannot be changed
+                    </div>
+                  )}
+                </div>
+
+                <p className="hidden text-green-400">
+                  verification email was sent! <br /> please check your email.
+                </p>
+
+                <div className="mt-6 flex flex-col gap-4 border-t border-[#eaeaea] pt-6">
+                  {!editLoading && (
+                    <>
+                      <button
+                        type="button"
+                        className="action-btn-danger w-fit"
+                        onClick={() => setConfirmationDelete(true)}
+                      >
+                        delete account
+                      </button>
+                      <p className="text-xs text-gray-400">
+                        permanent action. all saved screen and read entries will be removed.
+                      </p>
+                    </>
+                  )}
+
+                  <div className="flex gap-3">
+                    {!editLoading && (
+                      <button
+                        type="button"
+                        className="action-btn"
+                        onClick={() => navigate(-1)}
+                      >
+                        cancel
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className={`action-btn ${editLoading ? "cursor-not-allowed opacity-50" : ""}`}
+                      onClick={handleUpload}
+                      disabled={editLoading}
+                    >
+                      {editLoading ? "processing..." : "save"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
+              <input
+                type="text"
+                placeholder="verification code"
+                className="field-input"
+                onChange={(e) => setCode(e.target.value)}
+              />
+
+              <button type="button" className="action-btn w-fit" onClick={verifyCode}>
+                verify email
+              </button>
+            </div>
+          )}
+        </div>
+
+        <Footer />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useSearchParams, useNavigate } from "react-router";
 import type { Media } from "../../types/media";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
   completeMedia,
@@ -12,7 +12,9 @@ import {
   uploadThumbnail,
 } from "../../services/media.service";
 import LoadingScreen from "../../components/ui/LoadingScreen";
+import Footer from "../../components/ui/Footer";
 import { useQueryClient } from "@tanstack/react-query";
+import "../../styles/animations.css";
 
 const Edit = () => {
   const [isDelete, setIsDelete] = useState(false);
@@ -50,6 +52,7 @@ const Edit = () => {
   const { getToken } = useAuth();
   const [media, setMedia] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadMedia = async () => {
@@ -69,6 +72,28 @@ const Edit = () => {
 
     loadMedia();
   }, [getToken]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const root = containerRef.current;
+    if (!root) return;
+
+    const elements = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [loading, media]);
 
   useEffect(() => {
     if (isEdit) {
@@ -390,37 +415,46 @@ const Edit = () => {
     <>
       <title>more info</title>
 
+      <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+        <div className="landing-ambient" aria-hidden="true" />
+
+        <div ref={containerRef} className="relative z-10">
       {media.map((item: Media) => {
         if (item.id === parseInt(id!))
           return (
-            <div className="flex gap-20 content-center justify-center flex-wrap h-[100vh]">
+            <div className="reveal mx-auto flex max-w-5xl flex-wrap items-start justify-center gap-12 px-6 py-16 sm:px-10 lg:gap-20 lg:py-20">
               {/* confirmation pop up */}
               {isDelete && (
-                <div className="fixed h-[100vh] w-[100vw] flex flex-col justify-center items-center bg-gray-100/50 backdrop-blur">
-                  <div className="flex flex-col justify-center items-center bg-white w-[350px] h-[160px]">
+                <div className="modal-overlay">
+                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
                     <p>are you sure to delete?</p>
+                    <p className="text-xs text-gray-400">
+                      this cannot be undone.
+                    </p>
 
-                    <div className="flex gap-7 mt-7">
-                      <span
-                        className="cursor-pointer underline"
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="action-btn-danger"
                         onClick={() => handleDelete(item.type)}
                       >
                         yes
-                      </span>
-                      <span
-                        className="cursor-pointer underline"
+                      </button>
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => setIsDelete(false)}
                       >
                         no
-                      </span>
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
               {isMarkCompleted && (
-                <div className="fixed h-[100vh] w-[100vw] flex flex-col justify-center items-center bg-gray-100/50 backdrop-blur">
-                  <div className="flex flex-col justify-center items-center bg-white w-[390px] h-[210px]">
+                <div className="modal-overlay">
+                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
                     <p>mark as completed?</p>
 
                     <p>
@@ -430,33 +464,35 @@ const Edit = () => {
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         placeholder="0-5"
-                        className={`border py-1 px-3 w-[70px] mt-5 ${isError && "border-red-500"}`}
+                        className={`field-input mt-2 w-[70px] ${isError ? "border-red-500" : ""}`}
                       />
                     </p>
 
-                    <div className="flex gap-7 mt-7">
-                      <span
-                        className="cursor-pointer underline"
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => {
                           clickCompleted(value);
                         }}
                       >
                         yes
-                      </span>
-                      <span
-                        className="cursor-pointer underline"
+                      </button>
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => setIsMarkCompleted(false)}
                       >
                         no
-                      </span>
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
               {showRatingModal && (
-                <div className="fixed h-[100vh] w-[100vw] flex flex-col justify-center items-center bg-gray-100/50 backdrop-blur">
-                  <div className="flex flex-col justify-center items-center bg-white w-[350px] h-[180px]">
+                <div className="modal-overlay">
+                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
                     <p className="mb-3">give rating (0 - 5)</p>
 
                     <input
@@ -473,10 +509,10 @@ const Edit = () => {
                           },
                         }));
                       }}
-                      className={`border py-1 px-3 w-[120px] transition-colors duration-300 ${
+                      className={`field-input w-[120px] ${
                         errors[selectedItem?.id || 0]?.rating
                           ? "border-red-500"
-                          : "border-black"
+                          : ""
                       }`}
                     />
 
@@ -498,33 +534,36 @@ const Edit = () => {
                       </p>
                     </div>
 
-                    <div className="flex gap-7 mt-7">
-                      <span
-                        className="cursor-pointer underline"
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={confirmComplete}
                       >
                         {loadingComplete ? "saving..." : "yes"}
-                      </span>
+                      </button>
 
-                      <span
-                        className="cursor-pointer underline"
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => setShowRatingModal(false)}
                       >
                         no
-                      </span>
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
               {showUncompleteModal && (
-                <div className="fixed h-[100vh] w-[100vw] flex justify-center items-center bg-gray-100/50 backdrop-blur">
-                  <div className="flex flex-col justify-center items-center bg-white w-[350px] h-[160px]">
+                <div className="modal-overlay">
+                  <div className="modal-panel flex flex-col items-center gap-4 text-center">
                     <p className="mb-5">set this item back to uncompleted?</p>
 
-                    <div className="flex gap-7">
-                      <span
-                        className={`cursor-pointer underline ${
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className={`action-btn ${
                           uncompleteLoading
                             ? "pointer-events-none opacity-50"
                             : ""
@@ -532,10 +571,11 @@ const Edit = () => {
                         onClick={confirmUncomplete}
                       >
                         {uncompleteLoading ? "processing..." : "yes"}
-                      </span>
+                      </button>
 
-                      <span
-                        className={`cursor-pointer underline ${
+                      <button
+                        type="button"
+                        className={`action-btn ${
                           uncompleteLoading
                             ? "pointer-events-none opacity-50"
                             : ""
@@ -547,15 +587,15 @@ const Edit = () => {
                         }}
                       >
                         no
-                      </span>
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
               {isEdit ? (
-                <div className="flex flex-col items-center gap-5">
-                  <div className="relative group">
+                <div className="flex w-80 shrink-0 flex-col items-center gap-4">
+                  <div className="landing-card group relative w-full overflow-hidden bg-[#f7f6f3]">
                     <img
                       src={
                         imageFile
@@ -565,26 +605,14 @@ const Edit = () => {
                             : item.image_url || "default-thumbnail.png"
                       }
                       alt="thumbnail"
-                      className="h-120 w-80 object-cover"
+                      className="h-120 w-full object-cover"
                     />
 
-                    {/* Overlay */}
                     <label
                       htmlFor="thumbnail-upload"
-                      className="
-                        absolute inset-0
-                        flex items-center justify-center
-                        bg-black/50
-                        opacity-0
-                        group-hover:opacity-100
-                        transition-opacity
-                        duration-300
-                        cursor-pointer
-                      "
+                      className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                     >
-                      <span className="text-white">
-                        {item.image_url ? "change thumbnail" : "upload thumbnail"}
-                      </span>
+                      {item.image_url ? "change thumbnail" : "upload thumbnail"}
                     </label>
 
                     <input
@@ -603,52 +631,69 @@ const Edit = () => {
                     />
                   </div>
 
-                  {item.image_url && !deleteThumbnail && !imageFile && (
-                    <span
-                      className="underline cursor-pointer"
-                      onClick={() => {
-                        setDeleteThumbnail(true);
-                        setImageFile(null);
-                      }}
-                    >
-                      delete thumbnail
-                    </span>
-                  )}
+                  {(item.image_url && !deleteThumbnail && !imageFile) || deleteThumbnail ? (
+                    <div className="flex w-full flex-wrap justify-center gap-3">
+                      {item.image_url && !deleteThumbnail && !imageFile && (
+                        <button
+                          type="button"
+                          className="action-btn-danger"
+                          onClick={() => {
+                            setDeleteThumbnail(true);
+                            setImageFile(null);
+                          }}
+                        >
+                          delete thumbnail
+                        </button>
+                      )}
 
-                  {deleteThumbnail && (
-                    <span
-                      className="underline cursor-pointer"
-                      onClick={() => setDeleteThumbnail(false)}
-                    >
-                      restore thumbnail
-                    </span>
-                  )}
+                      {deleteThumbnail && (
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => setDeleteThumbnail(false)}
+                        >
+                          restore thumbnail
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
-                <img
-                  src={
-                    item.image_url ? item.image_url : "default-thumbnail.png"
-                  }
-                  alt="test"
-                  className="h-120 w-80 object-cover"
-                />
+                <div className="landing-card overflow-hidden bg-[#f7f6f3]">
+                  <img
+                    src={
+                      item.image_url ? item.image_url : "default-thumbnail.png"
+                    }
+                    alt={item.title}
+                    className="h-120 w-80 object-cover"
+                  />
+                </div>
               )}
 
-              <div className="flex flex-col justify-center min-w-[400px]">
+              <div className="flex min-w-[320px] max-w-md flex-col justify-center lg:min-w-[400px]">
                 {isEdit ? (
-                  ""
-                ) : (
-                  <span
-                    className="underline cursor-pointer mb-1"
-                    onClick={() => navigate(-1)}
-                  >
-                    back to prev tab
+                  <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+                    editing
                   </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="back-link mb-6 w-fit"
+                      onClick={() => navigate(-1)}
+                    >
+                      back to prev tab
+                    </button>
+
+                    <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+                      {item.type}
+                    </span>
+                  </>
                 )}
 
                 {isEdit ? (
-                  <div className="flex items-center gap-1 mt-3">
-                    <span>category:</span>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="whitespace-nowrap text-sm text-gray-400">category:</span>
                     <input
                       type="text"
                       value={
@@ -674,85 +719,45 @@ const Edit = () => {
                           },
                         }));
                       }}
-                      className="border py-1 px-3 w-full"
+                      className="field-input"
                     />
                   </div>
                 ) : (
-                  <p className="mt-5">{item.category.join(", ")}</p>
+                  <p className="font-mono text-sm text-gray-400">
+                    {item.category.join(", ") || "no category"}
+                  </p>
                 )}
 
                 {isEdit ? (
-                  <div className="mt-2 w-full">
-                    <div className="flex items-center gap-2">
-                      <span className="whitespace-nowrap">title:</span>
-
-                      <div className="relative group w-full">
-                        <input
-                          type="text"
-                          value={editData[item.id]?.title || ""}
-                          onChange={(e) =>
-                            setEditData((prev) => ({
-                              ...prev,
-                              [item.id]: {
-                                ...(prev[item.id] || {}),
-                                title: e.target.value,
-                              },
-                            }))
-                          }
-                          className={`border py-1 px-3 w-full transition-colors duration-300 ${
-                            errors[item.id]?.title
-                              ? "border-red-500"
-                              : "border-black"
-                          }`}
-                        />
-
-                        {/* tooltip error */}
-                        {errors[item.id]?.title && (
-                          <div
-                            className="
-                              absolute left-0 top-full
-                              translate-y-1
-
-                              opacity-0 group-hover:opacity-100
-                              transition-opacity duration-200
-
-                              bg-white
-                              border border-red-400
-                              text-red-500 text-sm
-                              px-2 py-1
-                              rounded-md
-                              shadow-md
-                              whitespace-nowrap
-                              z-10
-
-                              before:content-['']
-                              before:absolute
-                              before:-top-1
-                              before:left-3
-                              before:w-2
-                              before:h-2
-                              before:bg-white
-                              before:rotate-45
-                              before:border-l
-                              before:border-t
-                              before:border-red-400
-                            "
-                          >
-                            {errors[item.id]?.title}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  <div className="mt-3 w-full">
+                    <span className="mb-2 block text-sm text-gray-400">title:</span>
+                    <input
+                      type="text"
+                      value={editData[item.id]?.title || ""}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          [item.id]: {
+                            ...(prev[item.id] || {}),
+                            title: e.target.value,
+                          },
+                        }))
+                      }
+                      className={`field-input ${
+                        errors[item.id]?.title ? "border-red-500" : ""
+                      }`}
+                    />
+                    {errors[item.id]?.title && (
+                      <p className="field-error">{errors[item.id]?.title}</p>
+                    )}
                   </div>
                 ) : (
-                  <h1 className="font-bold text-[26px] lowercase">
-                    {item.title}
-                  </h1>
+                  <h1 className="text-2xl font-bold sm:text-[26px]">{item.title}</h1>
                 )}
 
                 {isEdit ? (
-                  <>
-                    <p className="mt-2">description: </p>
+                  <div className="mt-3">
+                    <span className="mb-2 block text-sm text-gray-400">description:</span>
                     <textarea
                       value={editData[item.id]?.description || ""}
                       onChange={(e) =>
@@ -764,21 +769,45 @@ const Edit = () => {
                           },
                         }))
                       }
-                      className="border py-2 px-3 w-full min-h-[100px] resize-none"
+                      className="field-input min-h-[100px] resize-none"
                     />
-                  </>
+                  </div>
                 ) : (
-                  <p className="lowercase text-gray-400 mb-5">
+                  <p className="mb-5 mt-4 leading-relaxed text-gray-400">
                     {item.description || "no description added"}
                   </p>
                 )}
 
-                {item && (
-                  <p className="lowercase mt-2">
-                    {item.type === "read"
-                      ? "where to read:"
-                      : "where to watch:"}{" "}
-                    {isEdit ? (
+                {item && !isEdit ? (
+                  <div className="mt-6 border-t border-[#eaeaea]">
+                    <div className="detail-meta-row">
+                      <span className="text-sm text-gray-400">
+                        {item.type === "read" ? "where to read" : "where to watch"}
+                      </span>
+                      <span className="font-mono text-sm">{item.source || "—"}</span>
+                    </div>
+
+                    <div className="detail-meta-row">
+                      <span className="text-sm text-gray-400">
+                        {item.is_completed ? "total" : "last"}{" "}
+                        {item.type === "read" ? "page" : "episode"}
+                      </span>
+                      <span className="font-mono text-sm">{item.last_episode}</span>
+                    </div>
+
+                    {item.is_completed && (
+                      <div className="detail-meta-row">
+                        <span className="text-sm text-gray-400">rating</span>
+                        <span className="font-mono text-sm">{item.rating}/5</span>
+                      </div>
+                    )}
+                  </div>
+                ) : item && isEdit ? (
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <span className="mb-2 block text-sm text-gray-400">
+                        {item.type === "read" ? "where to read" : "where to watch"}
+                      </span>
                       <input
                         type="text"
                         value={editData[item.id]?.source || ""}
@@ -791,22 +820,15 @@ const Edit = () => {
                             },
                           }))
                         }
-                        className="border py-1 px-3 w-[300px]"
+                        className="field-input"
                       />
-                    ) : (
-                      item.source
-                    )}
-                  </p>
-                )}
+                    </div>
 
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="whitespace-nowrap">
-                    {item.is_completed ? "total" : "last"}{" "}
-                    {item.type === "read" ? "page" : "episode"}:
-                  </p>
-
-                  {isEdit ? (
-                    <div className="relative group">
+                    <div>
+                      <span className="mb-2 block text-sm text-gray-400">
+                        {item.is_completed ? "total" : "last"}{" "}
+                        {item.type === "read" ? "page" : "episode"}
+                      </span>
                       <input
                         type="text"
                         value={editData[item.id]?.last_episode ?? ""}
@@ -820,59 +842,18 @@ const Edit = () => {
                             },
                           }))
                         }
-                        className={`border py-1 px-3 w-[120px] ${
-                          errors[item.id]?.lastEpisode
-                            ? "border-red-500"
-                            : "border-black"
+                        className={`field-input max-w-[160px] ${
+                          errors[item.id]?.lastEpisode ? "border-red-500" : ""
                         }`}
                       />
-
                       {errors[item.id]?.lastEpisode && (
-                        <div
-                          className="
-                            absolute left-0 top-full
-                            translate-y-1
-
-                            opacity-0 group-hover:opacity-100
-                            transition-opacity duration-200
-
-                            bg-white
-                            border border-red-400
-                            text-red-500 text-sm
-                            px-2 py-1
-                            rounded-md
-                            shadow-md
-                            whitespace-nowrap
-                            z-10
-
-                            before:content-['']
-                            before:absolute
-                            before:-top-1
-                            before:left-3
-                            before:w-2
-                            before:h-2
-                            before:bg-white
-                            before:rotate-45
-                            before:border-l
-                            before:border-t
-                            before:border-red-400
-                          "
-                        >
-                          {errors[item.id]?.lastEpisode}
-                        </div>
+                        <p className="field-error">{errors[item.id]?.lastEpisode}</p>
                       )}
                     </div>
-                  ) : (
-                    <p className="ml-1">{item.last_episode}</p>
-                  )}
-                </div>
 
-                {item.is_completed && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <p className="whitespace-nowrap">rating:</p>
-
-                    {isEdit ? (
-                      <div className="relative group">
+                    {item.is_completed && (
+                      <div>
+                        <span className="mb-2 block text-sm text-gray-400">rating</span>
                         <input
                           type="text"
                           value={editData[item.id]?.rating ?? ""}
@@ -886,89 +867,61 @@ const Edit = () => {
                               },
                             }))
                           }
-                          className={`border py-1 px-3 w-[100px] ${
-                            errors[item.id]?.rating
-                              ? "border-red-500"
-                              : "border-black"
+                          className={`field-input max-w-[160px] ${
+                            errors[item.id]?.rating ? "border-red-500" : ""
                           }`}
                         />
-
                         {errors[item.id]?.rating && (
-                          <div
-                            className="
-                              absolute left-0 top-full
-                              translate-y-1
-
-                              opacity-0 group-hover:opacity-100
-                              transition-opacity duration-200
-
-                              bg-white
-                              border border-red-400
-                              text-red-500 text-sm
-                              px-2 py-1
-                              rounded-md
-                              shadow-md
-                              whitespace-nowrap
-                              z-10
-
-                              before:content-['']
-                              before:absolute
-                              before:-top-1
-                              before:left-3
-                              before:w-2
-                              before:h-2
-                              before:bg-white
-                              before:rotate-45
-                              before:border-l
-                              before:border-t
-                              before:border-red-400
-                            "
-                          >
-                            {errors[item.id]?.rating}
-                          </div>
+                          <p className="field-error">{errors[item.id]?.rating}</p>
                         )}
                       </div>
-                    ) : (
-                      <p className="ml-1">{item.rating}/5</p>
                     )}
                   </div>
-                )}
+                ) : null}
 
-                <div className="flex flex-col mt-15 gap-2">
+                <div
+                  key={isEdit ? "edit-actions" : "view-actions"}
+                  className="card-actions-fade mt-10 flex flex-col gap-3"
+                >
                   {isEdit ? (
-                    <span
-                      className="inline-flex w-fit underline cursor-pointer"
+                    <button
+                      type="button"
+                      className="action-btn-danger w-fit"
                       onClick={() => setIsDelete(true)}
                     >
                       delete
-                    </span>
+                    </button>
                   ) : item.is_completed ? (
-                    <span
-                      className="inline-flex w-fit underline cursor-pointer"
+                    <button
+                      type="button"
+                      className="action-btn w-fit"
                       onClick={() => openUncompleteModal(item)}
                     >
                       set back to uncomplete
-                    </span>
+                    </button>
                   ) : (
-                    <span
-                      className="inline-flex w-fit underline cursor-pointer"
+                    <button
+                      type="button"
+                      className="action-btn w-fit"
                       onClick={() => openCompleteModal(item)}
                     >
                       mark as complete
-                    </span>
+                    </button>
                   )}
 
                   {isEdit ? (
                     <div className="flex gap-3">
-                      <span
-                        className="underline cursor-pointer"
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => handleSave(item)}
                       >
                         {loading ? "saving..." : "save"}
-                      </span>
+                      </button>
 
-                      <span
-                        className="underline cursor-pointer"
+                      <button
+                        type="button"
+                        className="action-btn"
                         onClick={() => {
                           setIsEdit(false);
                           setDeleteThumbnail(false);
@@ -976,21 +929,25 @@ const Edit = () => {
                         }}
                       >
                         cancel
-                      </span>
+                      </button>
                     </div>
                   ) : (
-                    <span
-                      className="inline-flex w-fit underline cursor-pointer"
+                    <button
+                      type="button"
+                      className="action-btn w-fit"
                       onClick={() => setIsEdit(true)}
                     >
                       edit
-                    </span>
+                    </button>
                   )}
                 </div>
               </div>
             </div>
           );
       })}
+          <Footer />
+        </div>
+      </div>
     </>
   );
 };

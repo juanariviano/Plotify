@@ -1,12 +1,15 @@
 import { useNavigate } from "react-router";
 import { useUser, useReverification } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ClerkError } from "../../types/auth";
 import { Eye, EyeOff } from "lucide-react";
 import LoadingScreen from "../../components/ui/LoadingScreen";
+import Footer from "../../components/ui/Footer";
+import "../../styles/animations.css";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -22,19 +25,36 @@ const ChangePassword = () => {
   const [loading, setLoading] = useState(false);
   const [changes, setChanges] = useState(false);
 
-  // harus di fix nnti, karena masih munculin jendela ui dari clerk (biasanya minta reverifikasi)
-  const updatePasswordWithReverification = useReverification(
-    async () => {
-      await user?.updatePassword({
-        currentPassword,
-        newPassword,
-        signOutOfOtherSessions: true,
-      });
-    }
-  );
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || loading) return;
+
+    const elements = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [loading]);
+
+  const updatePasswordWithReverification = useReverification(async () => {
+    await user?.updatePassword({
+      currentPassword,
+      newPassword,
+      signOutOfOtherSessions: true,
+    });
+  });
 
   const handleChangePassword = async () => {
-    if(loading) return;
+    if (loading) return;
     setError("");
     setSuccess("");
 
@@ -52,12 +72,11 @@ const ChangePassword = () => {
       setLoading(true);
       setChanges(true);
       await updatePasswordWithReverification();
-      
-      setSuccess("Password changed successfully");
+
+      setSuccess("password changed successfully");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      
     } catch (err: unknown) {
       console.log(err);
       setLoading(false);
@@ -72,86 +91,99 @@ const ChangePassword = () => {
     }
   };
 
-  if(loading){
-    return <LoadingScreen />
+  if (loading) {
+    return <LoadingScreen />;
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-[100vh]">
-      <title>change password</title>
-      <div className="flex flex-col gap-3">
-        <h1 className="font-bold text-[26px]">plotify</h1>
+    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+      <div className="landing-ambient" aria-hidden="true" />
 
-        <div className="relative w-[350px]">
-          <input
-            type={showOldPassword ? "text" : "password"}
-            className="border py-4 px-6 w-full pr-12"
-            value={currentPassword}
-            placeholder="old password"
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowOldPassword(!showOldPassword)}
-            className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-          >
-            {showOldPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-          </button>
+      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
+        <title>change password</title>
+
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10">
+          <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
+            <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+              security
+            </span>
+
+            <h1 className="mb-6 text-2xl font-bold sm:text-[26px]">change password</h1>
+
+            <div className="relative w-full">
+              <input
+                type={showOldPassword ? "text" : "password"}
+                className="field-input pr-12"
+                value={currentPassword}
+                placeholder="old password"
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowOldPassword(!showOldPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
+              >
+                {showOldPassword ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
+            </div>
+
+            <div className="relative w-full">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="field-input pr-12"
+                value={newPassword}
+                placeholder="new password"
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
+              >
+                {showPassword ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
+            </div>
+
+            <div className="relative w-full">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                className="field-input pr-12"
+                value={confirmPassword}
+                placeholder="confirm password"
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
+              >
+                {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
+            </div>
+
+            {error && <p className="field-error">{error}</p>}
+            {success && <p className="text-sm text-gray-400">{success}</p>}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={() => navigate(-1)}
+              >
+                {changes ? "back" : "cancel"}
+              </button>
+              <button
+                type="button"
+                className="action-btn"
+                onClick={handleChangePassword}
+              >
+                save
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="relative w-[350px]">
-          <input
-            type={showPassword ? "text" : "password"}
-            className="border py-4 px-6 w-full pr-12"
-            value={newPassword}
-            placeholder="new password"
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-          >
-            {showPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-          </button>
-        </div>
-
-        <div className="relative w-[350px]">
-          <input
-            type={showConfirmPassword ? "text" : "password"}
-            className="border py-4 px-6 w-full pr-12"
-            value={confirmPassword}
-            placeholder="confirm password"
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-          >
-            {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-          </button>
-        </div>
-
-        {error && <p className="text-red-500 max-w-sm">{error}</p>}
-        {success && <p className="text-green-500">{success}</p>}
-
-        <div className="flex gap-3">
-          <span
-            className="underline cursor-pointer mt-3"
-            onClick={() => {
-              navigate(-1);
-            }}
-          >
-            {changes ? 'back' : 'cancel'}
-          </span>
-          <span
-            className="underline cursor-pointer mt-3"
-            onClick={handleChangePassword}
-          >
-            save
-          </span>
-        </div>
+        <Footer />
       </div>
     </div>
   );

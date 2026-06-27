@@ -1,17 +1,40 @@
 import { useSearchParams, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createMedia, uploadThumbnail } from "../../services/media.service";
+import Footer from "../../components/ui/Footer";
+import "../../styles/animations.css";
 
 const Add = () => {
   const [searchParams] = useSearchParams();
   const item = searchParams.get("item");
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = `add new ${item}`;
   }, [item]);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+
+    const elements = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
@@ -111,151 +134,135 @@ const Add = () => {
   };
 
   return (
-    <div className="flex gap-20 content-center justify-center flex-wrap h-[100vh]">
-      <input
-        type="file"
-        accept="image/*"
-        id="fileInput"
-        hidden
-        onChange={handleImageChange}
-      />
-      <label
-        htmlFor="fileInput"
-        className="relative border h-120 w-80 cursor-pointer overflow-hidden"
-      >
-        {preview ? (
-          <>
-            <img
-              src={preview}
-              alt="preview"
-              className="w-full h-full object-cover"
-            />
-            <div
-              className="absolute inset-0
-                        bg-black/40
-                        opacity-0
-                        hover:opacity-100
-                        flex items-center justify-center
-                        text-white
-                        transition-opacity
-                        duration-300"
-            >
-              change image
-            </div>
-          </>
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            upload image
-          </div>
-        )}
-      </label>
+    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+      <div className="landing-ambient" aria-hidden="true" />
 
-      <div className="flex flex-col justify-center">
-        <p className="text-gray-400 mb-10">
-          {item === "screen" ? "add new screen" : "add new read"}
-        </p>
-
-        <div className="flex flex-col gap-2">
-          <div className="relative">
+      <div ref={containerRef} className="relative z-10">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-center gap-12 px-6 py-16 sm:px-10 lg:gap-20 lg:py-24">
+          <div className="reveal w-80 shrink-0">
             <input
-              type="text"
-              placeholder="title"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-
-                if (errors.title) {
-                  setErrors((prev) => ({
-                    ...prev,
-                    title: "",
-                  }));
-                }
-              }}
-              className={`py-4 px-6 w-[350px] border transition-colors duration-300 ${
-                errors.title ? "border-red-500" : "border-black"
-              }`}
+              type="file"
+              accept="image/*"
+              id="fileInput"
+              hidden
+              onChange={handleImageChange}
             />
-
-            <div
-              className={`
-                overflow-hidden
-                transition-all
-                duration-300
-                ease-in-out
-                ${errors.title ? "max-h-10 opacity-100 mt-1" : "max-h-0 opacity-0"}
-              `}
+            <label
+              htmlFor="fileInput"
+              className="landing-card relative block h-120 w-80 cursor-pointer overflow-hidden bg-[#f7f6f3]"
             >
-              <p className="text-red-500 text-sm">{errors.title}</p>
-            </div>
+              {preview ? (
+                <>
+                  <img
+                    src={preview}
+                    alt="preview"
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 transition-opacity duration-300 hover:opacity-100">
+                    change image
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                  upload image
+                </div>
+              )}
+            </label>
           </div>
 
-          <input
-            type="text"
-            className="border py-4 px-6 w-[350px]"
-            placeholder="short description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+          <div className="reveal flex w-full max-w-[350px] flex-col justify-center">
+            <span className="mb-8 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+              {item === "screen" ? "add new screen" : "add new read"}
+            </span>
 
-          <input
-            type="text"
-            className="border py-4 px-6 w-[350px]"
-            placeholder="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
+            <div className="flex flex-col gap-3">
+              <div>
+                <input
+                  type="text"
+                  placeholder="title"
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
 
-          <input
-            type="text"
-            className="border py-4 px-6 w-[350px]"
-            placeholder="source"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-          />
+                    if (errors.title) {
+                      setErrors((prev) => ({
+                        ...prev,
+                        title: "",
+                      }));
+                    }
+                  }}
+                  className={`field-input ${errors.title ? "border-red-500" : ""}`}
+                />
+                {errors.title && <p className="field-error">{errors.title}</p>}
+              </div>
 
-          <div className="relative">
-            <input
-              type="number"
-              placeholder={item === "screen" ? "last episode" : "last page"}
-              value={lastEpisode}
-              onChange={(e) => {
-                setLastEpisode(e.target.value);
+              <input
+                type="text"
+                className="field-input"
+                placeholder="short description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
 
-                if (errors.lastEpisode) {
-                  setErrors((prev) => ({
-                    ...prev,
-                    lastEpisode: "",
-                  }));
-                }
-              }}
-              className={`py-4 px-6 w-[350px] border transition-colors ${
-                errors.lastEpisode ? "border-red-500" : "border-black"
-              }`}
-            />
+              <input
+                type="text"
+                className="field-input"
+                placeholder="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
 
-            {errors.lastEpisode && (
-              <p className="absolute text-red-500 text-sm mt-1">
-                {errors.lastEpisode}
-              </p>
-            )}
+              <input
+                type="text"
+                className="field-input"
+                placeholder="source"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+              />
+
+              <div>
+                <input
+                  type="number"
+                  placeholder={item === "screen" ? "last episode" : "last page"}
+                  value={lastEpisode}
+                  onChange={(e) => {
+                    setLastEpisode(e.target.value);
+
+                    if (errors.lastEpisode) {
+                      setErrors((prev) => ({
+                        ...prev,
+                        lastEpisode: "",
+                      }));
+                    }
+                  }}
+                  className={`field-input ${errors.lastEpisode ? "border-red-500" : ""}`}
+                />
+                {errors.lastEpisode && (
+                  <p className="field-error">{errors.lastEpisode}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-10 flex gap-3">
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="action-btn disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "saving..." : "save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="action-btn"
+              >
+                cancel
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex mt-10 gap-3">
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "saving..." : "save"}
-          </button>
-          <span
-            className="underline cursor-pointer"
-            onClick={() => navigate(-1)}
-          >
-            cancel
-          </span>
-        </div>
+        <Footer />
       </div>
     </div>
   );
