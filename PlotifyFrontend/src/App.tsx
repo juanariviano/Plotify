@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import { ProtectedRoute, PublicRoute } from "./components/AuthRoutes";
 
 import Home from "./page/menus/Home";
@@ -23,6 +23,7 @@ function App() {
     <Routes>
       // auth
       <Route path="/ssocallback" element={<SsoCallback />} />
+      <Route path="/v1/oauth_callback" element={<Navigate to="/" replace />} />
       // public
       <Route
         path="/signin"

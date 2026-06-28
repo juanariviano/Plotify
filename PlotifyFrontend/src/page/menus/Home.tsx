@@ -12,6 +12,14 @@ const Home = () => {
   const authPath = (path: string) => (isSignedIn ? path : "/signin");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("err_code")) {
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
+
+  useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
 
