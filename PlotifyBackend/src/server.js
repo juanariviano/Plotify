@@ -34,9 +34,13 @@ app.use("/auth", authRoutes);
 app.use("/media", authMiddleware, attachUserId, mediaRoutes);
 app.use("/profile", authMiddleware, attachUserId, profileRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server has running on port: ${PORT}`);
-});
+// buat railway
+// app.listen(PORT, () => {
+//   console.log(`Server has running on port: ${PORT}`);
+// });
+
+// buat vercel
+export default app;
 
 // setup ngrok (tools yg bikin localhost server bisa diakses dari internet) -> buat clerk
 // - jalanin npm install -g ngrok
