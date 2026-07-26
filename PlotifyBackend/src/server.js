@@ -14,10 +14,12 @@ const PORT = process.env.PORT || 8080;
 // cors
 app.use(cors({
   origin: [
-    'https://yourplotify.site',    // production
-    'http://localhost:5173'         // development
+    'https://yourplotify.site',
+    'http://localhost:5173'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 // app.use(cors());
 app.use(clerkMiddleware());
