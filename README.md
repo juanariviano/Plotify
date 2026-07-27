@@ -18,23 +18,30 @@ The question that kept coming up: **where do I store the last episode I watched 
 - **User profiles** — Edit your profile, upload a profile picture, change password, or delete your account.
 - **Authentication** — Sign up, sign in, forgot/reset password, and SSO via Clerk.
 
+## Live
+
+| Surface | URL |
+|---------|-----|
+| **Frontend** | [https://yourplotify.site](https://yourplotify.site) |
+| **Backend API** | [https://plotify-backend-drab.vercel.app](https://plotify-backend-drab.vercel.app) |
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, Axios |
-| **Backend** | Node.js, Express 5 |
+| **Backend** | Node.js, Express 5 (serverless on Vercel) |
 | **Database** | Supabase (PostgreSQL) |
 | **Storage** | Supabase Storage (media thumbnails & profile images) |
 | **Auth** | Clerk |
-| **Deployment** | Frontend → [Vercel](https://vercel.com) · Backend → [Railway](https://railway.app) |
+| **Deployment** | Frontend → [Vercel](https://vercel.com) · Backend → [Vercel](https://vercel.com) |
 
 ## Project Structure
 
 ```
 Plotify/
 ├── PlotifyFrontend/   # React + Vite app
-└── PlotifyBackend/    # Express API server
+└── PlotifyBackend/    # Express API (Vercel serverless)
 ```
 
 ### Frontend (`PlotifyFrontend/`)
@@ -42,7 +49,7 @@ Plotify/
 - Pages for home, screen/read shelves, add/edit cards, profile, and auth flows
 - Clerk React SDK for authentication
 - TanStack Query for data fetching and caching
-- Deployed on Vercel
+- Deployed on Vercel (`yourplotify.site`)
 
 ### Backend (`PlotifyBackend/`)
 
@@ -50,7 +57,7 @@ Plotify/
 - Clerk middleware for protected routes
 - Supabase client for database and file storage
 - Clerk webhooks to sync user data on sign-up
-- Deployed on Railway
+- Deployed on Vercel as a serverless Express app (`plotify-backend-drab.vercel.app`)
 
 ## Getting Started
 
@@ -68,6 +75,17 @@ cd PlotifyBackend
 npm install
 # create a .env file with Supabase and Clerk credentials
 npm run dev
+```
+
+Example backend `.env`:
+
+```env
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+PORT=8080
 ```
 
 #### Clerk webhooks & ngrok (local development)
@@ -101,7 +119,7 @@ For local development, expose your backend with [ngrok](https://ngrok.com):
 
 Flow: **Clerk → ngrok → backend → Supabase**
 
-> **Note:** Each time you restart ngrok (on the free plan), the URL changes — update the webhook endpoint URL in Clerk to match. In production on Railway, use your Railway backend URL instead of ngrok (e.g. `https://your-app.up.railway.app/webhooks/clerk`).
+> **Note:** Each time you restart ngrok (on the free plan), the URL changes — update the webhook endpoint URL in Clerk to match. In production, use your Vercel backend URL instead of ngrok (e.g. `https://plotify-backend-drab.vercel.app/webhooks/clerk`).
 
 ### Frontend
 
@@ -112,12 +130,42 @@ npm install
 npm run dev
 ```
 
-The frontend runs at `http://localhost:5173` and expects the backend at the port configured in your environment (default `8080`).
+Example frontend `.env`:
+
+```env
+VITE_CLERK_PUBLISHABLE_KEY=
+VITE_BACKEND_URL=http://localhost:8080
+```
+
+The frontend runs at `http://localhost:5173` and expects the backend at the URL in `VITE_BACKEND_URL` (default local port `8080`).
 
 ## Deployment
 
-- **Frontend** — Connect the `PlotifyFrontend` directory to Vercel. Set Clerk publishable key and backend API URL in environment variables.
-- **Backend** — Deploy `PlotifyBackend` on Railway. Set Supabase credentials, Clerk secret key, and `CLERK_WEBHOOK_SECRET` in Railway env vars. Point the Clerk webhook endpoint to your Railway URL: `https://<your-railway-app>/webhooks/clerk`.
+Both apps are deployed on Vercel.
+
+### Frontend
+
+1. Connect the `PlotifyFrontend` directory to a Vercel project.
+2. Set environment variables:
+   - `VITE_CLERK_PUBLISHABLE_KEY`
+   - `VITE_BACKEND_URL=https://plotify-backend-drab.vercel.app`
+3. Deploy. Custom domain: `yourplotify.site`.
+
+### Backend
+
+1. Connect the `PlotifyBackend` directory to a separate Vercel project.
+2. Set environment variables:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `CLERK_WEBHOOK_SECRET`
+3. Deploy. Production API: `https://plotify-backend-drab.vercel.app`.
+4. In the Clerk Dashboard, point the webhook endpoint to:
+   `https://plotify-backend-drab.vercel.app/webhooks/clerk`
+5. In the backend Vercel project, keep **Deployment Protection / Vercel Authentication** off for Production so the frontend can call the API freely.
+
+Health check: `GET /` should return `{ "ok": true, "service": "plotify-backend" }`.
 
 ## License
 
