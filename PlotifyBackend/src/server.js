@@ -11,41 +11,52 @@ import attachUserId from "./middleware/attachUserId.js";
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// cors
-app.use(cors({
-  origin: [
-    'https://yourplotify.site',
-    'http://localhost:5173'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.options('*', cors());
-// app.use(cors());
+const allowedOrigins = [
+  "https://yourplotify.site",
+  "https://www.yourplotify.site",
+  "http://localhost:5173",
+];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`origin ${origin} not allowed by cors`));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(clerkMiddleware());
 
-// karena berkaitan dgn autentikasi maka harus pake raw data (express.raw)
-// biar yang data yg diproses daru pengguna itu hanya yg berformat json, dan tidak diubah ke object, tpi jadi buffer (data asli, tanpa diubah)
-app.use('/webhooks', express.raw({ type: 'application/json' }));
+// Clerk webhooks need the raw body buffer for signature verification
+app.use("/webhooks", express.raw({ type: "application/json" }));
 app.use(express.json());
 
-// alur : clerk -> webhook -> be -> supabase
-// routes
+app.get("/", (_req, res) => {
+  res.status(200).json({ ok: true, service: "plotify-backend" });
+});
+
+// flow: clerk -> webhook -> backend -> supabase
 app.use("/webhooks", webhookRoutes);
 app.use("/auth", authRoutes);
 app.use("/media", authMiddleware, attachUserId, mediaRoutes);
 app.use("/profile", authMiddleware, attachUserId, profileRoutes);
 
-// buat railway
-// app.listen(PORT, () => {
-//   console.log(`Server has running on port: ${PORT}`);
-// });
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ message: "server error" });
+});
 
-// buat vercel
+// Local only. On Vercel the app is exported as a serverless function.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server has running on port: ${PORT}`);
+  });
+}
+
 export default app;
-
-// setup ngrok (tools yg bikin localhost server bisa diakses dari internet) -> buat clerk
-// - jalanin npm install -g ngrok
-// - ngrok config add-authtoken <token>
-// - ngrok http <port backend>
