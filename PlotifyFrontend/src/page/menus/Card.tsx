@@ -6,7 +6,7 @@ import {
   completeMedia,
   deleteMedia,
   updateMedia,
-  getMediaData,
+  getMediaById,
   uncompleteMedia,
   deleteMediaThumbnail,
   uploadThumbnail,
@@ -60,10 +60,10 @@ const Edit = () => {
       try {
         setLoading(true);
         const token = await getToken();
-        if (!token) return;
+        if (!token || !id) return;
 
-        const data = await getMediaData(token);
-        setMedia(data);
+        const data = await getMediaById(token, parseInt(id, 10));
+        setMedia([data]);
       } catch (err) {
         console.log(err);
       } finally {
@@ -72,7 +72,7 @@ const Edit = () => {
     };
 
     loadMedia();
-  }, [getToken]);
+  }, [getToken, id]);
 
   useEffect(() => {
     if (loading) return;

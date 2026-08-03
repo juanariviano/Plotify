@@ -2,39 +2,20 @@ import Footer from "../../components/ui/Footer";
 import Navbar from "../../components/ui/Navbar";
 import Item from "../../components/ui/Item";
 import { Link } from "react-router";
-import { useAuth } from "@clerk/clerk-react";
-import { getMediaData } from "../../services/media.service";
-import LoadingScreen from "../../components/ui/LoadingScreen";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import type { Media } from "../../types/media";
 import "../../styles/animations.css";
 
 const Screen = () => {
   const page: string = window.location.pathname;
   const itemAdd: string = page.slice(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { getToken } = useAuth();
-
-  const { data: media = [], isLoading } = useQuery({
-    queryKey: ["media"],
-    queryFn: async () => {
-      const token = await getToken();
-
-      if (!token) {
-        throw new Error("No token");
-      }
-
-      return getMediaData(token);
-    },
-    staleTime: 1000 * 60 * 10,
-  });
-
-  const filteredMedia = media.filter((item: Media) =>
-    item.title.toLowerCase().includes(search.toLowerCase()),
-  );
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     const root = containerRef.current;
@@ -54,11 +35,7 @@ const Screen = () => {
 
     elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [isLoading]);
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
+  }, [debouncedSearch]);
 
   return (
     <>
@@ -89,7 +66,7 @@ const Screen = () => {
               </Link>
             </div>
 
-            <Item page={page} data={filteredMedia} />
+            <Item page={page} search={debouncedSearch} />
           </div>
 
           <Footer />

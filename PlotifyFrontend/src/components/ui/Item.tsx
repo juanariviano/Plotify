@@ -1,18 +1,51 @@
 import { Link } from "react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Media, ItemsProps } from "../../types/media";
+import LoadMore from "./LoadMore";
+import { DEFAULT_PAGE_SIZE, useMediaInfinite } from "../../hooks/useMediaInfinite";
 import "../../styles/animations.css";
 
-const Item = ({ page, data }: ItemsProps) => {
+type MediaTab = "ongoing" | "completed";
+
+const tabBaseClass =
+  "flex flex-1 cursor-pointer items-center justify-center gap-2 border px-4 py-3 text-sm transition-all duration-500 ease-in-out active:scale-[0.98] sm:px-6 sm:py-4";
+
+const getTabClass = (isActive: boolean, tab: MediaTab) => {
+  if (!isActive) {
+    return `${tabBaseClass} border-[#eaeaea] bg-white text-gray-400 hover:bg-black hover:text-white`;
+  }
+
+  if (tab === "completed") {
+    return `${tabBaseClass} border-[rgba(52,101,56,0.12)] bg-[#edf3ec] text-[#346538]`;
+  }
+
+  return `${tabBaseClass} border-[#111111] bg-[#111111] text-white`;
+};
+
+const Item = ({ page, search = "" }: ItemsProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<MediaTab>("ongoing");
+  const mediaType = page.includes("screen") ? "screen" : "read";
+  const ongoingLabel = page.includes("screen") ? "ongoing" : "on reads";
 
-  const pageData = data.filter((item: Media) => page.includes(item.type));
+  const ongoing = useMediaInfinite({
+    type: mediaType,
+    isCompleted: false,
+    search,
+  });
 
-  const checkComplete = pageData.some((item: Media) => item.is_completed === true);
-  const checkUncomplete = pageData.some(
-    (item: Media) => item.is_completed === false,
-  );
-  const hasData = pageData.length > 0;
+  const completed = useMediaInfinite({
+    type: mediaType,
+    isCompleted: true,
+    search,
+  });
+
+  const activeQuery = activeTab === "ongoing" ? ongoing : completed;
+  const isCompletedView = activeTab === "completed";
+
+  useEffect(() => {
+    setActiveTab("ongoing");
+  }, [search]);
 
   useEffect(() => {
     const root = containerRef.current;
@@ -32,7 +65,12 @@ const Item = ({ page, data }: ItemsProps) => {
 
     elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [data, page]);
+  }, [
+    activeTab,
+    activeQuery.items.length,
+    activeQuery.isLoadingMore,
+    search,
+  ]);
 
   const progressLabel = page.includes("screen") ? "last eps" : "last page";
 
@@ -59,7 +97,20 @@ const Item = ({ page, data }: ItemsProps) => {
     </Link>
   );
 
-  if (!hasData) {
+  const isInitialLoading =
+    (ongoing.isLoading || completed.isLoading) &&
+    ongoing.items.length === 0 &&
+    completed.items.length === 0;
+
+  if (isInitialLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <span className="text-sm tracking-[0.08em] text-gray-400">loading...</span>
+      </div>
+    );
+  }
+
+  if (ongoing.total === 0 && completed.total === 0) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <span className="text-sm tracking-[0.08em] text-gray-400">no items found</span>
@@ -67,45 +118,70 @@ const Item = ({ page, data }: ItemsProps) => {
     );
   }
 
-  let ongoingIndex = 0;
-  let completedIndex = 0;
-
   return (
     <div ref={containerRef}>
-      {checkUncomplete && (
-        <div className="reveal mb-6 mt-2">
-          <span className="inline-block border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-            {page.includes("screen") ? "ongoing" : "on reads"}
-          </span>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {pageData.map((item: Media) => {
-          if (item.is_completed === false) {
-            const card = renderCard(item, ongoingIndex, false);
-            ongoingIndex += 1;
-            return card;
-          }
-          return null;
-        })}
+      <div className="reveal mb-8 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("ongoing")}
+          className={getTabClass(activeTab === "ongoing", "ongoing")}
+        >
+          <span>{ongoingLabel}</span>
+          <span className="font-mono text-xs opacity-70">{ongoing.total}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("completed")}
+          className={getTabClass(activeTab === "completed", "completed")}
+        >
+          <span>completed</span>
+          <span className="font-mono text-xs opacity-70">{completed.total}</span>
+        </button>
       </div>
 
-      {checkComplete && (
-        <div className="reveal mb-6 mt-10">
-          <span className="inline-block border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-            completed
-          </span>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {pageData.map((item: Media) => {
-          if (item.is_completed === true) {
-            const card = renderCard(item, completedIndex, true);
-            completedIndex += 1;
-            return card;
-          }
-          return null;
-        })}
+      <div key={activeTab}>
+        {activeQuery.isLoading && activeQuery.items.length === 0 ? (
+          <div className="flex h-[40vh] items-center justify-center">
+            <span className="text-sm tracking-[0.08em] text-gray-400">loading...</span>
+          </div>
+        ) : activeQuery.total === 0 ? (
+          <div className="flex h-[40vh] flex-col items-center justify-center gap-3">
+            <span className="inline-block border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
+              {activeTab === "ongoing" ? ongoingLabel : "completed"}
+            </span>
+            <span className="text-sm tracking-[0.08em] text-gray-400">no items here yet</span>
+          </div>
+        ) : (
+          <>
+            <div className="reveal mb-6 mt-2">
+              <span
+                className={`inline-block border px-3 py-1 text-[10px] tracking-[0.08em] ${
+                  isCompletedView
+                    ? "card-detail-badge card-detail-badge--completed"
+                    : "border-[#eaeaea] bg-[#f7f6f3] text-gray-400"
+                }`}
+              >
+                {isCompletedView ? "completed" : ongoingLabel}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {activeQuery.items.map((item, index) =>
+                renderCard(item, index, isCompletedView),
+              )}
+            </div>
+
+            <LoadMore
+              visibleCount={activeQuery.visibleCount}
+              total={activeQuery.total}
+              hasMore={activeQuery.hasMore}
+              isLoading={activeQuery.isLoadingMore}
+              onLoadMore={activeQuery.loadMore}
+              pageSize={DEFAULT_PAGE_SIZE}
+              className="mt-10"
+            />
+          </>
+        )}
       </div>
     </div>
   );

@@ -430,3 +430,17 @@
   transform: translateY(0);
   transition-delay: 380ms;
 }
+
+.load-more-skeleton {
+  animation: loadMoreSkeletonPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes loadMoreSkeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
