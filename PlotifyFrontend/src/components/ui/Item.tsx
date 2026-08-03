@@ -12,7 +12,11 @@ const tabBaseClass =
 
 const getTabClass = (isActive: boolean, tab: MediaTab) => {
   if (!isActive) {
-    return `${tabBaseClass} border-[#eaeaea] bg-white text-gray-400 hover:bg-black hover:text-white`;
+    if (tab === "completed") {
+      return `${tabBaseClass} border-[#eaeaea] bg-white text-gray-400 hover:border-[rgba(52,101,56,0.2)] hover:bg-[#edf3ec] hover:text-[#346538]`;
+    }
+
+    return `${tabBaseClass} border-[#eaeaea] bg-white text-gray-400 hover:border-[#111111] hover:bg-[#f7f6f3] hover:text-[#111111]`;
   }
 
   if (tab === "completed") {
