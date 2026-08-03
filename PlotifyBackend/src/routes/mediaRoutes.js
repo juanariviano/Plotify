@@ -25,16 +25,65 @@ router.post(
 
 // fetch data
 /**
- * balikin data2 screen dan reads berdasarkan user id
+ * balikin data media berdasarkan user id dengan pagination
+ * query: page, limit, type, is_completed, q
  */
 router.get("/", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(req.query.limit, 10) || 20),
+    );
+    const offset = (page - 1) * limit;
+    const { q, type, is_completed } = req.query;
+
+    let query = supabase
+      .from("media")
+      .select("*", { count: "exact" })
+      .eq("user_id", req.userId);
+
+    if (type) {
+      query = query.eq("type", type);
+    }
+
+    if (is_completed !== undefined && is_completed !== "") {
+      query = query.eq("is_completed", is_completed === "true");
+    }
+
+    if (q) {
+      query = query.ilike("title", `%${q}%`);
+    }
+
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) return res.status(500).json({ error });
+
+    res.status(200).json({ data, total: count, page, limit });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * balikin satu media berdasarkan id dan user id
+ */
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
   try {
     const { data, error } = await supabase
       .from("media")
       .select()
-      .eq("user_id", req.userId);
+      .eq("id", parseInt(id, 10))
+      .eq("user_id", req.userId)
+      .single();
 
-    if (error) return res.status(500).json({ error });
+    if (error) {
+      return res.status(404).json({ error: "Media not found" });
+    }
 
     res.status(200).json(data);
   } catch (error) {

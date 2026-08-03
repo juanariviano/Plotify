@@ -15,8 +15,15 @@ export type Media = {
 
 export type ItemsProps = {
   page: string;
+  search?: string;
+};
+
+export type PaginatedMediaResponse = {
   data: Media[];
-}
+  total: number;
+  page: number;
+  limit: number;
+};
 
 export type AddMediaPayload = {
   token: string,
