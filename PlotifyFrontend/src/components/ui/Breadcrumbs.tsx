@@ -13,19 +13,16 @@ const Breadcrumbs = ({
   className?: string;
 }) => {
   return (
-    <nav
-      aria-label="breadcrumb"
-      className={`reveal flex flex-wrap items-center gap-2 text-xs text-gray-400 ${className}`}
-    >
+    <nav aria-label="breadcrumb" className={`flex flex-wrap items-center gap-2 text-sm text-muted ${className}`}>
       {items.map((item, index) => (
         <span key={`${item.label}-${index}`} className="flex items-center gap-2">
-          {index > 0 && <span className="text-[#eaeaea]">/</span>}
+          {index > 0 && <span aria-hidden="true">/</span>}
           {item.to ? (
-            <Link to={item.to} className="transition-colors hover:text-black">
+            <Link to={item.to} className="transition-colors hover:text-ink">
               {item.label}
             </Link>
           ) : (
-            <span className="text-black">{item.label}</span>
+            <span className="max-w-[40ch] truncate text-ink">{item.label}</span>
           )}
         </span>
       ))}
