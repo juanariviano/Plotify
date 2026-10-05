@@ -1,22 +1,28 @@
 import { Link } from "react-router";
 import { useSignUp } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { Eye, EyeOff } from "lucide-react";
-import Footer from "../../components/ui/Footer";
-import "../../styles/animations.css";
+import { motion } from "motion/react";
+import { Check, Minus } from "lucide-react";
+import { useEffect, useState } from "react";
+import AuthLayout, { AuthHeading, AuthTabs, Divider, FormError } from "../../components/auth/AuthLayout";
+import PasswordInput from "../../components/ui/PasswordInput";
+import OtpInput from "../../components/ui/OtpInput";
+import { btn } from "../../lib/ui";
+
+const STRENGTH = ["", "weak", "okay", "good", "strong"];
+
+const passwordChecks = (pw: string) => [
+  { label: "at least 8 characters", ok: pw.length >= 8 },
+  { label: "includes a number", ok: /\d/.test(pw) },
+  { label: "includes a symbol or capital letter", ok: /[^a-z0-9]/.test(pw) },
+];
 
 const Signup = () => {
-  const page: string = window.location.pathname;
-  const containerRef = useRef<HTMLDivElement>(null);
   const { signUp, isLoaded } = useSignUp();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [code, setCode] = useState("");
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -35,33 +41,11 @@ const Signup = () => {
     setGoogleLoading(false);
   }, []);
 
-  useEffect(() => {
-    const root = containerRef.current;
-    if (!root) return;
-
-    const elements = root.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
-
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [pendingVerification]);
+  const checks = passwordChecks(password);
+  const score = password ? checks.filter((c) => c.ok).length + (password.length >= 12 ? 1 : 0) : 0;
 
   const handleSignup = async () => {
     if (!isLoaded || loading) return;
-
-    if (password !== confirmPassword) {
-      setError("password does not match");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -79,7 +63,10 @@ const Signup = () => {
       await signUp.reload();
       setError("");
     } catch (err) {
-      if (err instanceof Error) {
+      if (typeof err === "object" && err !== null && "errors" in err) {
+        const clerkError = err as { errors?: { longMessage?: string; message?: string }[] };
+        setError((clerkError.errors?.[0]?.longMessage || clerkError.errors?.[0]?.message || "something went wrong").toLowerCase());
+      } else if (err instanceof Error) {
         setError(err.message.toLowerCase());
       }
     } finally {
@@ -92,6 +79,7 @@ const Signup = () => {
 
     try {
       setLoading(true);
+      setError("");
 
       sessionStorage.setItem("signup_method", "email");
 
@@ -139,129 +127,141 @@ const Signup = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
-      <div className="landing-ambient" aria-hidden="true" />
+    <AuthLayout variant="signup" title="create account · plotify" stepKey={pendingVerification ? "verify" : "form"}>
+      {!pendingVerification ? (
+        <>
+          <AuthTabs />
+          <AuthHeading title="start your shelf." subtitle="takes less than a minute." />
 
-      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
-        <title>sign up</title>
+          <button
+            type="button"
+            className={btn("secondary", "lg", "w-full border-ink")}
+            disabled={googleLoading}
+            onClick={handleGoogleSignUp}
+          >
+            {googleLoading ? "redirecting…" : "sign up with google"}
+          </button>
 
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10">
-          <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
-            <span className="mb-2 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-              {pendingVerification ? "verification" : "create account"}
-            </span>
+          <Divider />
 
-            <h1 className="mb-4 text-2xl font-bold sm:text-[26px]">plotify</h1>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSignup();
+            }}
+          >
+            <div>
+              <label htmlFor="signup-email" className="label">email</label>
+              <input
+                id="signup-email"
+                type="email"
+                autoComplete="email"
+                className="field"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-            {!pendingVerification ? (
+            <div>
+              <label htmlFor="signup-password" className="label">password</label>
+              <PasswordInput
+                id="signup-password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div className="mt-2.5 grid grid-cols-4 gap-1" aria-hidden="true">
+                {[0, 1, 2, 3].map((i) => (
+                  <span key={i} className="h-1 overflow-hidden bg-line">
+                    <motion.span
+                      className={`block h-1 ${score >= 3 ? "bg-done" : "bg-accent"}`}
+                      initial={false}
+                      animate={{ width: i < score ? "100%" : "0%" }}
+                      transition={{ duration: 0.35, delay: i * 0.05 }}
+                    />
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted" aria-live="polite">
+                {password ? `strength: ${STRENGTH[Math.max(1, score)]}` : "use something you don't use anywhere else"}
+              </p>
+              <ul className="mt-2 flex flex-col gap-1 text-[13px]">
+                {checks.map((c) => (
+                  <motion.li
+                    key={c.label}
+                    animate={{ color: c.ok ? "#2f6a3a" : "#67645d" }}
+                    className="flex items-center gap-2"
+                  >
+                    <motion.span
+                      key={String(c.ok)}
+                      initial={{ scale: 0.4, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                    >
+                      {c.ok ? <Check size={14} strokeWidth={2.6} /> : <Minus size={14} />}
+                    </motion.span>
+                    {c.label}
+                  </motion.li>
+                ))}
+              </ul>
+            </div>
+
+            <FormError message={error} />
+
+            <button type="submit" disabled={loading} className={btn("primary", "lg", "mt-2 w-full")}>
+              {loading ? "creating…" : "create account"}
+            </button>
+          </form>
+
+          <p className="mt-7 text-sm text-muted">
+            already have a shelf?{" "}
+            <Link to="/signin" className="text-ink underline underline-offset-4">sign in</Link>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="eyebrow mb-3">step 2 of 3</p>
+          <AuthHeading
+            title="check your inbox."
+            subtitle={
               <>
-                <div className="mb-4 flex gap-4 border-b border-[#eaeaea] pb-3 text-sm">
-                  <Link
-                    to="/signin"
-                    className={`transition-colors hover:text-black ${page.includes("signin") ? "text-black" : "text-gray-400"}`}
-                  >
-                    sign in
-                  </Link>
-                  <Link
-                    to="/signup"
-                    className={`transition-colors hover:text-black ${page.includes("signup") ? "text-black" : "text-gray-400"}`}
-                  >
-                    sign up
-                  </Link>
-                </div>
-
-                <button
-                  type="button"
-                  className={`w-full px-6 py-3 ${googleLoading ? "cursor-not-allowed border border-[#eaeaea] bg-[#f7f6f3] opacity-50" : "google-btn cursor-pointer"}`}
-                  disabled={googleLoading}
-                  onClick={handleGoogleSignUp}
-                >
-                  {googleLoading ? "redirecting..." : "sign-up with google"}
-                </button>
-
-                <p className="my-2 text-sm text-gray-400">or with email</p>
-
-                <input
-                  type="email"
-                  className="field-input"
-                  placeholder="email"
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-
-                <div className="relative w-full">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="field-input pr-12"
-                    placeholder="password"
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-                  >
-                    {showPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
-                </div>
-
-                <div className="relative w-full">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    className="field-input pr-12"
-                    placeholder="confirm password"
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-                  >
-                    {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
-                </div>
-
-                {error && <p className="field-error">{error}</p>}
-
-                <button
-                  type="button"
-                  className="action-btn mt-3 w-fit disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={loading}
-                  onClick={handleSignup}
-                >
-                  {loading ? "processing..." : "register"}
-                </button>
+                we sent a 6-digit code to <span className="text-ink">{email}</span>.
               </>
-            ) : (
-              <>
-                <p className="mb-2 text-sm text-gray-400">
-                  enter the code sent to your email
-                </p>
-
-                <input
-                  type="text"
-                  placeholder="verification code"
-                  className="field-input"
-                  onChange={(e) => setCode(e.target.value)}
-                />
-
-                {error && <p className="field-error">{error}</p>}
-
-                <button
-                  type="button"
-                  className="action-btn mt-3 w-fit disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={loading}
-                  onClick={verifyCode}
-                >
-                  {loading ? "processing..." : "verify email"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <Footer />
-      </div>
-    </div>
+            }
+          />
+          <form
+            className="flex flex-col gap-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              verifyCode();
+            }}
+          >
+            <fieldset>
+              <legend className="label">verification code</legend>
+              <OtpInput value={code} onChange={setCode} invalid={!!error} />
+              <p className="hint">tip: paste the whole code into the first box.</p>
+            </fieldset>
+            <FormError message={error} />
+            <button type="submit" disabled={loading || code.length < 6} className={btn("primary", "lg", "w-full")}>
+              {loading ? "checking…" : "verify email"}
+            </button>
+            <button
+              type="button"
+              className="text-left text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+              onClick={() => {
+                setPendingVerification(false);
+                setCode("");
+                setError("");
+              }}
+            >
+              use a different email
+            </button>
+          </form>
+        </>
+      )}
+    </AuthLayout>
   );
 };
 

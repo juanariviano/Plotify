@@ -10,7 +10,10 @@ export const getUserData = async (clerkId: string | null) => {
 
     return res.data;
   } catch (error) {
-    console.log(error);
+    // a 404 means no profile row yet; callers handle it (setup flow or sign-out)
+    if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+      console.log(error);
+    }
     throw error;
   }
 };

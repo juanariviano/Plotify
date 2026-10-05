@@ -1,15 +1,14 @@
 import { useAuth, useSignUp, useUser } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { completeProfile } from "../../services/auth.service";
 import { getUserData } from "../../services/profile.service";
 import LoadingScreen from "../../components/ui/LoadingScreen";
-import Footer from "../../components/ui/Footer";
-import "../../styles/animations.css";
+import AuthLayout, { AuthHeading, FormError } from "../../components/auth/AuthLayout";
+import { btn } from "../../lib/ui";
 
 const VerifySignup = () => {
   const navigate = useNavigate();
-  const containerRef = useRef<HTMLDivElement>(null);
   const { setActive } = useSignUp();
   const { isLoaded, user } = useUser();
   const { isSignedIn } = useAuth();
@@ -48,26 +47,6 @@ const VerifySignup = () => {
 
     checkUser();
   }, [isLoaded, isSignedIn]);
-
-  useEffect(() => {
-    const root = containerRef.current;
-    if (!root || checkingUser) return;
-
-    const elements = root.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
-
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [checkingUser]);
 
   const handleCompleteProfile = async () => {
     if (!fullname || !username) {
@@ -126,54 +105,51 @@ const VerifySignup = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
-      <div className="landing-ambient" aria-hidden="true" />
+    <AuthLayout variant="signup" title="finish setup · plotify">
+      <p className="eyebrow mb-3">last step</p>
+      <AuthHeading title="what should we call you?" subtitle="one last thing before your shelf is ready." />
 
-      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
-        <title>signup</title>
-
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10">
-          <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
-            <span className="mb-2 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-              finish setup
-            </span>
-
-            <h1 className="mb-4 text-2xl font-bold sm:text-[26px]">plotify</h1>
-
-            <p className="mb-2 text-sm text-gray-400">
-              one last step before your shelf is ready
-            </p>
-
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleCompleteProfile();
+        }}
+      >
+        <div>
+          <label htmlFor="setup-name" className="label">full name</label>
+          <input
+            id="setup-name"
+            type="text"
+            autoComplete="name"
+            className="field"
+            value={fullname}
+            onChange={(e) => setFullname(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="setup-username" className="label">username</label>
+          <div className="flex h-12 border border-line-strong bg-white transition-[border-color,box-shadow] focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(23_22_15/0.06)]">
+            <span className="flex items-center pr-1 pl-3.5 text-muted">@</span>
             <input
+              id="setup-username"
               type="text"
-              className="field-input"
-              placeholder="full name"
-              onChange={(e) => setFullname(e.target.value)}
+              autoComplete="username"
+              className="min-w-0 flex-1 bg-transparent pr-3.5 text-[15px] outline-none"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
             />
-
-            <input
-              type="text"
-              className="field-input"
-              placeholder="username"
-              onChange={(e) => setUsername(e.target.value)}
-            />
-
-            {error && <p className="field-error">{error}</p>}
-
-            <button
-              type="button"
-              className="action-btn mt-3 w-fit disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={loading}
-              onClick={handleCompleteProfile}
-            >
-              {loading ? "processing..." : "continue to home page"}
-            </button>
           </div>
+          <p className="hint">no spaces. you can change it later.</p>
         </div>
 
-        <Footer />
-      </div>
-    </div>
+        <FormError message={error} />
+
+        <button type="submit" disabled={loading} className={btn("primary", "lg", "mt-2 w-full")}>
+          {loading ? "setting up…" : "open my shelf"}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 
