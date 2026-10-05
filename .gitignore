@@ -1,4 +1,4 @@
 .agents/
 skills-lock.json
 .vite/
-.DS_Store
+.DS_Store.claude/
