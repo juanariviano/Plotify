@@ -1,11 +1,11 @@
-const page500 = () => {
-  return (
-    <div className="flex items-center justify-center h-[100vh]">
-      <title>server error</title>
-      
-      <h1 className="font-bold italic text-[26px]">internal server error</h1>
-    </div>
-  )
-}
+import ErrorPage from "../../components/ui/ErrorPage";
 
-export default page500
+const page500 = () => (
+  <ErrorPage
+    code="500"
+    title="something slipped off the shelf."
+    body="our server hit a problem. try again in a moment; nothing you saved has been lost."
+  />
+);
+
+export default page500;

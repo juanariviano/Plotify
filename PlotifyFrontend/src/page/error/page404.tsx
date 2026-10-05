@@ -1,11 +1,11 @@
-const page404 = () => {
-  return (
-    <div className="flex items-center justify-center h-[100vh]">
-      <title>not found</title>
-      
-      <h1 className="font-bold italic text-[26px]">page not found</h1>
-    </div>
-  )
-}
+import ErrorPage from "../../components/ui/ErrorPage";
 
-export default page404
+const page404 = () => (
+  <ErrorPage
+    code="404"
+    title="you've lost your place."
+    body="this page doesn't exist, or it moved. your shelves are still where you left them."
+  />
+);
+
+export default page404;

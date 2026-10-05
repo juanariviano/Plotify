@@ -1,59 +1,74 @@
-import { useSearchParams, useNavigate } from "react-router";
-import type { Media } from "../../types/media";
-import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowUpRight, Check, ImageUp, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { Media } from "../../types/media";
 import {
   completeMedia,
   deleteMedia,
-  updateMedia,
+  deleteMediaThumbnail,
   getMediaById,
   uncompleteMedia,
-  deleteMediaThumbnail,
+  updateMedia,
   uploadThumbnail,
 } from "../../services/media.service";
+import { useLogProgress } from "../../hooks/useLogProgress";
 import LoadingScreen from "../../components/ui/LoadingScreen";
+import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
-import { useQueryClient } from "@tanstack/react-query";
-import "../../styles/animations.css";
+import Cover from "../../components/ui/Cover";
+import Modal from "../../components/ui/Modal";
+import TagInput from "../../components/ui/TagInput";
+import AnimatedNumber from "../../components/ui/AnimatedNumber";
+import { StarDisplay, StarPicker } from "../../components/ui/Stars";
+import { easeOut, fadeUp, stagger } from "../../lib/motion";
+import { btn, isUrl, sourceLabel, unitOf } from "../../lib/ui";
 
-const Edit = () => {
-  const [isDelete, setIsDelete] = useState(false);
-  const [isEdit, setIsEdit] = useState(false);
-  const [isMarkCompleted, setIsMarkCompleted] = useState(false);
-  const [isError, setIsError] = useState(false);
-  const [value, setValue] = useState("");
+type EditForm = {
+  title: string;
+  description: string;
+  category: string[];
+  source: string;
+  last_episode: string;
+  rating: number;
+};
+
+type FormErrors = { title?: string; lastEpisode?: string; rating?: string };
+
+const formatAdded = (value: Date | string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toLowerCase();
+};
+
+const Card = () => {
   const [searchParams] = useSearchParams();
   const id = searchParams.get("id");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  type EditMedia = Omit<Media, "rating"> & {
-    rating: string | null;
-  };
-
-  type EditData = Record<string, EditMedia>;
-
-  const [editData, setEditData] = useState<EditData>({});
-
-  function clickCompleted(value: string) {
-    if (
-      value.trim() === "" ||
-      isNaN(Number(value)) ||
-      parseFloat(value) < 0 ||
-      parseFloat(value) > 5
-    ) {
-      setIsError(true);
-      return false;
-    }
-    navigate(-1);
-    return true;
-  }
-
   const { getToken } = useAuth();
-  const [media, setMedia] = useState<Media[]>([]);
+  const log = useLogProgress();
+
+  const [item, setItem] = useState<Media | null>(null);
   const [loading, setLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [direction, setDirection] = useState<1 | -1>(1);
+
+  const [isEdit, setIsEdit] = useState(false);
+  const [form, setForm] = useState<EditForm | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [deleteThumbnail, setDeleteThumbnail] = useState(false);
+
+  const [showDelete, setShowDelete] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
+  const [showUncomplete, setShowUncomplete] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingError, setRatingError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const loadMedia = async () => {
@@ -63,7 +78,7 @@ const Edit = () => {
         if (!token || !id) return;
 
         const data = await getMediaById(token, parseInt(id, 10));
-        setMedia([data]);
+        setItem(data);
       } catch (err) {
         console.log(err);
       } finally {
@@ -75,336 +90,169 @@ const Edit = () => {
   }, [getToken, id]);
 
   useEffect(() => {
-    if (loading) return;
+    if (item) document.title = `${item.title} · plotify`;
+  }, [item]);
 
-    const root = containerRef.current;
-    if (!root) return;
+  const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
-    const elements = root.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
+  const refreshShelves = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["media"] });
+  };
 
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [loading, media]);
+  const startEdit = () => {
+    if (!item) return;
+    setForm({
+      title: item.title,
+      description: item.description ?? "",
+      category: item.category ?? [],
+      source: item.source ?? "",
+      last_episode: String(item.last_episode ?? ""),
+      rating: item.rating ?? 0,
+    });
+    setErrors({});
+    setImageFile(null);
+    setDeleteThumbnail(false);
+    setIsEdit(true);
+  };
 
-  useEffect(() => {
-    if (isEdit) {
-      const initial = Object.fromEntries(
-        media.map((item) => [
-          item.id,
-          {
-            ...item,
-            rating: item.rating?.toString() ?? null,
-          },
-        ]),
-      );
+  const cancelEdit = () => {
+    setIsEdit(false);
+    setImageFile(null);
+    setDeleteThumbnail(false);
+  };
 
-      setEditData(initial);
+  const validate = (data: EditForm, media: Media) => {
+    const next: FormErrors = {};
+
+    if (!data.title.trim()) next.title = "title is required";
+
+    const raw = data.last_episode.trim();
+    const num = Number(raw);
+    if (!raw) next.lastEpisode = media.type === "screen" ? "last episode is required" : "last page is required";
+    else if (Number.isNaN(num)) next.lastEpisode = "must be a number";
+    else if (num < 0) next.lastEpisode = "cannot be negative";
+    else if (num > 10000) next.lastEpisode = "value too large";
+
+    if (media.is_completed && (data.rating < 0 || data.rating > 5 || !data.rating)) {
+      next.rating = "rating is required";
     }
-  }, [isEdit, media]);
 
-  const handleDelete = async (type: string) => {
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!item || !form || !validate(form, item)) return;
+
+    setSaving(true);
     try {
       const token = await getToken();
-
       if (!token) return;
 
-      await deleteMediaThumbnail({
-        token,
-        id: Number(id),
-      });
-
-      await deleteMedia({
-        token,
-        id: Number(id),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ["media"],
-      });
-
-      navigate(type === "read" ? "/read" : "/screen");
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const [categoryInput, setCategoryInput] = useState<Record<number, string>>(
-    {},
-  );
-
-  const [errors, setErrors] = useState<
-    Record<number, { title?: string; lastEpisode?: string; rating?: string }>
-  >({});
-
-  const validate = (item: Media) => {
-    const data = editData[item.id];
-
-    const newErrors = {
-      title: "",
-      lastEpisode: "",
-      rating: "",
-    };
-
-    let isValid = true;
-
-    // TITLE VALIDATION
-    if (!data?.title?.trim()) {
-      newErrors.title = "title is required";
-      isValid = false;
-    }
-
-    // LAST_EPISODE VALIDATION
-    const rawValue = data?.last_episode;
-
-    if (rawValue === null || rawValue === undefined) {
-      newErrors.lastEpisode =
-        item.type === "screen"
-          ? "last episode is required"
-          : "last page is required";
-      isValid = false;
-    } else {
-      const num = Number(rawValue);
-
-      if (isNaN(num)) {
-        newErrors.lastEpisode = "must be a number";
-        isValid = false;
-      } else if (num < 0) {
-        newErrors.lastEpisode = "cannot be negative";
-        isValid = false;
-      } else if (num > 10000) {
-        newErrors.lastEpisode = "value too large";
-        isValid = false;
-      }
-    }
-
-    // RATING VALIDATION
-    const rawRating = data?.rating;
-    if (item.is_completed) {
-      if (rawRating === null || rawRating === undefined || rawRating === "") {
-        newErrors.rating = "rating is required";
-        isValid = false;
-      } else {
-        const num = Number(rawRating);
-
-        if (isNaN(num)) {
-          newErrors.rating = "must be a number";
-          isValid = false;
-        } else if (num < 0) {
-          newErrors.rating = "cannot be negative";
-          isValid = false;
-        } else if (num > 5) {
-          newErrors.rating = "max rating is 5";
-          isValid = false;
-        }
-      }
-    }
-
-    setErrors((prev) => ({
-      ...prev,
-      [item.id]: newErrors,
-    }));
-
-    return isValid;
-  };
-
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [deleteThumbnail, setDeleteThumbnail] = useState(false);
-
-  const handleSave = async (item: Media) => {
-    if (!validate(item)) return;
-
-    setLoading(true);
-
-    try {
-      const token = await getToken();
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const payload = editData[item.id];
-
-      let imageUrl = payload.image_url;
+      let imageUrl = item.image_url;
 
       if (deleteThumbnail || imageFile) {
         await deleteMediaThumbnail({ token, id: item.id });
       }
 
-      if(imageFile){
-        imageUrl = await uploadThumbnail({
-          token,
-          file: imageFile,
-        });
-      }else if(deleteThumbnail) {
+      if (imageFile) {
+        imageUrl = await uploadThumbnail({ token, file: imageFile });
+      } else if (deleteThumbnail) {
         imageUrl = null;
       }
 
-      await updateMedia({
-        token,
-        id: item.id,
-        mediaData: {
-          ...payload,
-          image_url: imageUrl,
-          rating: payload?.rating === null ? null : Number(payload?.rating),
-          last_episode: Number(payload?.last_episode),
-        },
-      });
+      const mediaData = {
+        title: form.title.trim(),
+        description: form.description,
+        category: form.category,
+        source: form.source,
+        image_url: imageUrl,
+        last_episode: Number(form.last_episode),
+        ...(item.is_completed ? { rating: form.rating } : {}),
+      };
 
-      await queryClient.invalidateQueries({
-        queryKey: ["media"],
-      });
-
-      await queryClient.refetchQueries({
-        queryKey: ["media"],
-      });
-
-      setIsEdit(false);
-      setDeleteThumbnail(false);
-      setImageFile(null);
-
-      navigate(-1);
+      await updateMedia({ token, id: item.id, mediaData });
+      setItem({ ...item, ...mediaData, rating: item.is_completed ? form.rating : item.rating });
+      await refreshShelves();
+      cancelEdit();
     } catch (err) {
       console.log(err);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const [loadingComplete, setLoadingComplete] = useState(false);
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Media | null>(null);
-  const [ratingInput, setRatingInput] = useState<string>("");
-
-  const [showUncompleteModal, setShowUncompleteModal] = useState(false);
-  const [uncompleteLoading, setUncompleteLoading] = useState(false);
-
-  const openCompleteModal = (item: Media) => {
-    setSelectedItem(item);
-    setRatingInput(editData[item.id]?.rating?.toString() || "");
-    setShowRatingModal(true);
+  const step = (delta: 1 | -1) => {
+    if (!item) return;
+    const next = Math.max(0, item.last_episode + delta);
+    if (next === item.last_episode) return;
+    setDirection(delta);
+    setItem({ ...item, last_episode: next });
+    log.mutate(
+      { item, next },
+      { onError: () => setItem((current) => (current ? { ...current, last_episode: item.last_episode } : current)) },
+    );
   };
 
-  const openUncompleteModal = (item: Media) => {
-    setSelectedItem(item);
-    setShowUncompleteModal(true);
-  };
+  const handleDelete = async () => {
+    if (!item) return;
+    try {
+      setBusy(true);
+      const token = await getToken();
+      if (!token) return;
 
-  const validateRating = () => {
-    if (!selectedItem) return false;
+      await deleteMediaThumbnail({ token, id: item.id });
+      await deleteMedia({ token, id: item.id });
+      await refreshShelves();
 
-    const raw = ratingInput.trim();
-    const rating = parseFloat(raw);
-
-    if (!raw) {
-      setErrors((prev) => ({
-        ...prev,
-        [selectedItem.id]: {
-          ...prev[selectedItem.id],
-          rating: "rating is required",
-        },
-      }));
-      return false;
+      navigate(item.type === "read" ? "/read" : "/screen");
+    } catch (error) {
+      console.log(error);
+      setBusy(false);
     }
-
-    if (isNaN(rating)) {
-      setErrors((prev) => ({
-        ...prev,
-        [selectedItem.id]: {
-          ...prev[selectedItem.id],
-          rating: "rating must be a number",
-        },
-      }));
-      return false;
-    }
-
-    if (rating < 0 || rating > 5) {
-      setErrors((prev) => ({
-        ...prev,
-        [selectedItem.id]: {
-          ...prev[selectedItem.id],
-          rating: "rating must be 0 - 5",
-        },
-      }));
-      return false;
-    }
-
-    return true;
   };
 
   const confirmComplete = async () => {
-    if (!selectedItem) return;
+    if (!item) return;
+    if (!rating || rating < 0 || rating > 5) {
+      setRatingError("pick a rating from 1 to 5");
+      return;
+    }
 
     try {
-      setLoadingComplete(true);
-
+      setBusy(true);
       const token = await getToken();
-
       if (!token) return;
 
-      if (!validateRating()) return;
-
-      await completeMedia({
-        token,
-        id: selectedItem.id,
-        rating: parseFloat(ratingInput),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ["media"],
-      });
-
-      await queryClient.refetchQueries({
-        queryKey: ["media"],
-      });
-
-      setShowRatingModal(false);
-      setSelectedItem(null);
-
-      navigate(-1);
+      await completeMedia({ token, id: item.id, rating });
+      setItem({ ...item, is_completed: true, rating });
+      await refreshShelves();
+      setShowComplete(false);
     } catch (err) {
       console.log(err);
     } finally {
-      setLoadingComplete(false);
+      setBusy(false);
     }
   };
 
   const confirmUncomplete = async () => {
-    if (!selectedItem) return;
-
+    if (!item) return;
     try {
-      setUncompleteLoading(true);
-
+      setBusy(true);
       const token = await getToken();
       if (!token) return;
 
-      await uncompleteMedia({
-        token,
-        id: selectedItem.id,
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ["media"],
-      });
-
-      setShowUncompleteModal(false);
-      setSelectedItem(null);
-
-      navigate(-1);
+      await uncompleteMedia({ token, id: item.id });
+      setItem({ ...item, is_completed: false });
+      await refreshShelves();
+      setShowUncomplete(false);
     } catch (err) {
       console.log(err);
     } finally {
-      setUncompleteLoading(false);
+      setBusy(false);
     }
   };
 
@@ -412,630 +260,406 @@ const Edit = () => {
     return <LoadingScreen />;
   }
 
-  return (
-    <>
-      <title>more info</title>
-
-      <div className="relative min-h-screen bg-[#fbfafa] lowercase text-[#111111]">
-        <div className="landing-ambient" aria-hidden="true" />
-
-        <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
-      {media.map((item: Media) => {
-        if (item.id === parseInt(id!))
-          return (
-            <div
-              key={item.id}
-              className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-10 sm:px-10 lg:py-16"
-            >
-                <div className="reveal grid w-full items-start gap-10 lg:grid-cols-[minmax(280px,320px)_1fr] lg:gap-16">
-              {/* confirmation pop up */}
-              {isDelete && (
-                <div className="modal-overlay">
-                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
-                    <p
-                      className="card-detail-title text-xl"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                    >
-                      are you sure to delete?
-                    </p>
-                    <p className="text-xs leading-relaxed text-[#787774]">
-                      this cannot be undone.
-                    </p>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className="action-btn-danger"
-                        onClick={() => handleDelete(item.type)}
-                      >
-                        yes
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => setIsDelete(false)}
-                      >
-                        no
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isMarkCompleted && (
-                <div className="modal-overlay">
-                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
-                    <p
-                      className="card-detail-title text-xl"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                    >
-                      mark as completed?
-                    </p>
-
-                    <p className="text-sm text-[#787774]">
-                      add rating:{" "}
-                      <input
-                        type="string"
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
-                        placeholder="0-5"
-                        className={`field-input mt-2 w-[70px] text-center ${isError ? "border-[#9f2f2d]" : ""}`}
-                      />
-                    </p>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          clickCompleted(value);
-                        }}
-                      >
-                        yes
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => setIsMarkCompleted(false)}
-                      >
-                        no
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {showRatingModal && (
-                <div className="modal-overlay">
-                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
-                    <p
-                      className="card-detail-title mb-3 text-xl"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                    >
-                      give rating (0 - 5)
-                    </p>
-
-                    <input
-                      type="text"
-                      value={ratingInput}
-                      onChange={(e) => {
-                        setRatingInput(e.target.value);
-
-                        setErrors((prev) => ({
-                          ...prev,
-                          [selectedItem!.id]: {
-                            ...prev[selectedItem!.id],
-                            rating: "",
-                          },
-                        }));
-                      }}
-                      className={`field-input w-[120px] text-center ${
-                        errors[selectedItem?.id || 0]?.rating
-                          ? "border-[#9f2f2d]"
-                          : ""
-                      }`}
-                    />
-
-                    <div
-                      className={`
-                      overflow-hidden
-                      transition-all
-                      duration-300
-                      ease-in-out
-                      ${
-                        errors[selectedItem?.id || 0]?.rating
-                          ? "max-h-10 opacity-100 mt-1"
-                          : "max-h-0 opacity-0"
-                      }
-                    `}
-                    >
-                      <p className="text-sm text-[#9f2f2d]">
-                        {errors[selectedItem?.id || 0]?.rating}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className="action-btn-primary"
-                        onClick={confirmComplete}
-                      >
-                        {loadingComplete ? "saving..." : "yes"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => setShowRatingModal(false)}
-                      >
-                        no
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {showUncompleteModal && (
-                <div className="modal-overlay">
-                  <div className="modal-panel modal-panel-enter flex flex-col items-center gap-4 text-center">
-                    <p
-                      className="card-detail-title mb-3 text-xl"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                    >
-                      set this item back to uncompleted?
-                    </p>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className={`action-btn-primary ${
-                          uncompleteLoading
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }`}
-                        onClick={confirmUncomplete}
-                      >
-                        {uncompleteLoading ? "processing..." : "yes"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`action-btn ${
-                          uncompleteLoading
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }`}
-                        onClick={() => {
-                          if (uncompleteLoading) return;
-                          setShowUncompleteModal(false);
-                          setSelectedItem(null);
-                        }}
-                      >
-                        no
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isEdit ? (
-                <div className="flex w-full flex-col items-start gap-5">
-                  <Breadcrumbs
-                    className="mb-0 w-full"
-                    items={[
-                      { label: item.type, to: `/${item.type}` },
-                      { label: item.title },
-                      { label: "editing" },
-                    ]}
-                  />
-
-                  <div className="landing-card group relative w-full overflow-hidden bg-[#f7f6f3]">
-                    <div className="aspect-[3/4] overflow-hidden">
-                      <img
-                        src={
-                          imageFile
-                            ? URL.createObjectURL(imageFile)
-                            : deleteThumbnail
-                              ? "default-thumbnail.png"
-                              : item.image_url || "default-thumbnail.png"
-                        }
-                        alt="thumbnail"
-                        className="card-thumbnail-img h-full w-full object-cover"
-                      />
-                    </div>
-
-                    <label
-                      htmlFor="thumbnail-upload"
-                      className="card-thumbnail-overlay cursor-pointer"
-                    >
-                      {item.image_url ? "change thumbnail" : "upload thumbnail"}
-                    </label>
-
-                    <input
-                      id="thumbnail-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-
-                        if (!file) return;
-
-                        setImageFile(file);
-                        setDeleteThumbnail(false);
-                      }}
-                    />
-                  </div>
-
-                  {(item.image_url && !deleteThumbnail && !imageFile) || deleteThumbnail ? (
-                    <div className="flex w-full flex-wrap justify-center gap-3">
-                      {item.image_url && !deleteThumbnail && !imageFile && (
-                        <button
-                          type="button"
-                          className="action-btn-danger"
-                          onClick={() => {
-                            setDeleteThumbnail(true);
-                            setImageFile(null);
-                          }}
-                        >
-                          delete thumbnail
-                        </button>
-                      )}
-
-                      {deleteThumbnail && (
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => setDeleteThumbnail(false)}
-                        >
-                          restore thumbnail
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="flex w-full flex-col items-start gap-5">
-                  <Breadcrumbs
-                    className="mb-0 w-full"
-                    items={[
-                      { label: item.type, to: `/${item.type}` },
-                      { label: item.title },
-                    ]}
-                  />
-
-                  <div className="landing-card w-full overflow-hidden bg-[#f7f6f3]">
-                    <div className="aspect-[3/4] overflow-hidden">
-                      <img
-                        src={
-                          item.image_url ? item.image_url : "default-thumbnail.png"
-                        }
-                        alt={item.title}
-                        className="card-thumbnail-img h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex w-full min-w-0 flex-col items-start justify-center lg:pt-2">
-                {!isEdit ? (
-                  <div className="card-content-stagger w-full">
-                    <div className="mb-6 flex flex-wrap items-center gap-2">
-                      <span className="card-detail-badge card-detail-badge--type">
-                        {item.type}
-                      </span>
-                      {item.is_completed && (
-                        <span className="card-detail-badge card-detail-badge--completed">
-                          completed
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      {item.category.length > 0 ? (
-                        item.category.map((cat) => (
-                          <span key={cat} className="card-category-pill">
-                            {cat}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="font-mono text-xs text-[#787774]">
-                          no category
-                        </span>
-                      )}
-                    </div>
-
-                    <h1
-                      className="card-detail-title mb-5 text-[2rem] sm:text-[2.5rem]"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                    >
-                      {item.title}
-                    </h1>
-
-                    <p className="mb-8 max-w-lg leading-[1.6] text-[#787774]">
-                      {item.description || "no description added"}
-                    </p>
-
-                    <div className="card-meta-panel w-full">
-                      <div className="detail-meta-row">
-                        <span className="text-sm text-[#787774]">
-                          {item.type === "read" ? "where to read" : "where to watch"}
-                        </span>
-                        <span className="font-mono text-sm">{item.source || "—"}</span>
-                      </div>
-
-                      <div className="detail-meta-row">
-                        <span className="text-sm text-[#787774]">
-                          {item.is_completed ? "total" : "last"}{" "}
-                          {item.type === "read" ? "page" : "episode"}
-                        </span>
-                        <span className="font-mono text-sm">{item.last_episode}</span>
-                      </div>
-
-                      {item.is_completed && (
-                        <div className="detail-meta-row border-b-0">
-                          <span className="text-sm text-[#787774]">rating</span>
-                          <span className="bg-[#fbf3db] px-2 py-0.5 font-mono text-sm text-[#956400]">
-                            {item.rating}/5
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-6 flex flex-wrap items-center gap-2">
-                      <span className="card-detail-badge card-detail-badge--type">
-                        {item.type}
-                      </span>
-                      <span className="card-detail-badge card-detail-badge--editing">
-                        editing
-                      </span>
-                    </div>
-
-                  <div className="flex w-full flex-col gap-5">
-                    <div>
-                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                        category
-                      </span>
-                      <input
-                        type="text"
-                        value={
-                          categoryInput[item.id] ??
-                          (editData[item.id]?.category || []).join(", ")
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-
-                          setCategoryInput((prev) => ({
-                            ...prev,
-                            [item.id]: val,
-                          }));
-
-                          setEditData((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              ...prev[item.id],
-                              category: val
-                                .split(",")
-                                .map((c) => c.trim())
-                                .filter(Boolean),
-                            },
-                          }));
-                        }}
-                        className="field-input"
-                        placeholder="comma separated"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                        title
-                      </span>
-                      <input
-                        type="text"
-                        value={editData[item.id]?.title || ""}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              ...(prev[item.id] || {}),
-                              title: e.target.value,
-                            },
-                          }))
-                        }
-                        className={`field-input ${
-                          errors[item.id]?.title ? "border-[#9f2f2d]" : ""
-                        }`}
-                      />
-                      {errors[item.id]?.title && (
-                        <p className="field-error">{errors[item.id]?.title}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                        description
-                      </span>
-                      <textarea
-                        value={editData[item.id]?.description || ""}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              ...prev[item.id],
-                              description: e.target.value,
-                            },
-                          }))
-                        }
-                        className="field-input min-h-[100px] resize-none"
-                      />
-                    </div>
-
-                    <div className="card-edit-section flex flex-col gap-5">
-                      <div>
-                        <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                          {item.type === "read" ? "where to read" : "where to watch"}
-                        </span>
-                        <input
-                          type="text"
-                          value={editData[item.id]?.source || ""}
-                          onChange={(e) =>
-                            setEditData((prev) => ({
-                              ...prev,
-                              [item.id]: {
-                                ...prev[item.id],
-                                source: e.target.value,
-                              },
-                            }))
-                          }
-                          className="field-input"
-                        />
-                      </div>
-
-                      <div>
-                        <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                          {item.is_completed ? "total" : "last"}{" "}
-                          {item.type === "read" ? "page" : "episode"}
-                        </span>
-                        <input
-                          type="text"
-                          value={editData[item.id]?.last_episode ?? ""}
-                          onChange={(e) =>
-                            setEditData((prev) => ({
-                              ...prev,
-                              [item.id]: {
-                                ...(prev[item.id] || {}),
-                                last_episode:
-                                  e.target.value === "" ? null : e.target.value,
-                              },
-                            }))
-                          }
-                          className={`field-input max-w-[160px] ${
-                            errors[item.id]?.lastEpisode ? "border-[#9f2f2d]" : ""
-                          }`}
-                        />
-                        {errors[item.id]?.lastEpisode && (
-                          <p className="field-error">{errors[item.id]?.lastEpisode}</p>
-                        )}
-                      </div>
-
-                      {item.is_completed && (
-                        <div>
-                          <span className="mb-2 block text-xs tracking-[0.06em] text-[#787774]">
-                            rating
-                          </span>
-                          <input
-                            type="text"
-                            value={editData[item.id]?.rating ?? ""}
-                            onChange={(e) =>
-                              setEditData((prev) => ({
-                                ...prev,
-                                [item.id]: {
-                                  ...(prev[item.id] || {}),
-                                  rating:
-                                    e.target.value === "" ? null : e.target.value,
-                                },
-                              }))
-                            }
-                            className={`field-input max-w-[160px] ${
-                              errors[item.id]?.rating ? "border-[#9f2f2d]" : ""
-                            }`}
-                          />
-                          {errors[item.id]?.rating && (
-                            <p className="field-error">{errors[item.id]?.rating}</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  </>
-                )}
-
-                <div
-                  key={isEdit ? "edit-actions" : "view-actions"}
-                  className="card-actions-fade mt-10 flex w-full flex-col gap-3 border-t border-[#eaeaea] pt-8"
-                >
-                  {isEdit ? (
-                    <>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          className="action-btn-primary"
-                          onClick={() => handleSave(item)}
-                        >
-                          {loading ? "saving..." : "save"}
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => {
-                            setIsEdit(false);
-                            setDeleteThumbnail(false);
-                            setImageFile(null);
-                          }}
-                        >
-                          cancel
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="action-btn-danger w-fit"
-                        onClick={() => setIsDelete(true)}
-                      >
-                        delete
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {item.is_completed ? (
-                        <button
-                          type="button"
-                          className="action-btn-primary w-fit"
-                          onClick={() => openUncompleteModal(item)}
-                        >
-                          set back to uncomplete
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="action-btn-primary w-fit"
-                          onClick={() => openCompleteModal(item)}
-                        >
-                          mark as complete
-                        </button>
-                      )}
-
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => navigate(-1)}
-                        >
-                          back
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => setIsEdit(true)}
-                        >
-                          edit
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            </div>
-          );
-      })}
-          <Footer />
-        </div>
+  if (!item) {
+    return (
+      <div className="flex min-h-screen flex-col bg-paper text-ink lowercase">
+        <Navbar />
+        <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-start justify-center gap-5 px-5 py-20 sm:px-10">
+          <p className="eyebrow">not found</p>
+          <h1 className="font-serif text-5xl tracking-[-0.02em]">we couldn't find that title.</h1>
+          <p className="text-muted">it may have been deleted, or the link is out of date.</p>
+          <Link to="/screen" className={btn("primary", "lg")}>back to your shelf</Link>
+        </main>
+        <Footer />
       </div>
-    </>
+    );
+  }
+
+  const unit = unitOf(item.type);
+  const coverSrc = previewUrl ?? (deleteThumbnail ? null : item.image_url);
+  const added = formatAdded(item.created_at);
+
+  return (
+    <div className="flex min-h-screen flex-col bg-paper text-ink lowercase">
+      <Navbar />
+
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 pt-10 pb-24 sm:px-10">
+        <Breadcrumbs
+          items={[
+            { label: item.type, to: `/${item.type}` },
+            { label: item.title },
+            ...(isEdit ? [{ label: "editing" }] : []),
+          ]}
+        />
+
+        <div className="flex flex-wrap items-start gap-x-16 gap-y-10">
+          <motion.div
+            className="flex w-full flex-col gap-3 sm:w-[320px]"
+            initial={{ opacity: 0, y: 24, rotate: -1.5 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
+            transition={{ duration: 0.8, ease: easeOut }}
+          >
+            <div className="group relative">
+              <Cover
+                title={isEdit && form ? form.title || item.title : item.title}
+                src={coverSrc}
+                className="aspect-[3/4] w-full shadow-[0_30px_60px_-30px_rgb(23_22_15/0.5)]"
+                titleClassName="text-[34px]"
+              />
+              {isEdit && (
+                <label
+                  htmlFor="thumbnail-upload"
+                  className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-ink/55 text-sm text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100 focus-within:opacity-100"
+                >
+                  <ImageUp size={22} />
+                  {coverSrc ? "change cover" : "upload cover"}
+                  <input
+                    id="thumbnail-upload"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setImageFile(file);
+                      setDeleteThumbnail(false);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {isEdit ? (
+              <div className="flex flex-wrap gap-2">
+                {item.image_url && !deleteThumbnail && !imageFile && (
+                  <button type="button" className={btn("danger", "sm")} onClick={() => setDeleteThumbnail(true)}>
+                    <Trash2 size={14} /> remove cover
+                  </button>
+                )}
+                {(deleteThumbnail || imageFile) && (
+                  <button
+                    type="button"
+                    className={btn("secondary", "sm")}
+                    onClick={() => {
+                      setDeleteThumbnail(false);
+                      setImageFile(null);
+                    }}
+                  >
+                    <RotateCcw size={14} /> restore cover
+                  </button>
+                )}
+              </div>
+            ) : (
+              item.source &&
+              (isUrl(item.source) ? (
+                <a href={item.source} target="_blank" rel="noreferrer" className={btn("primary", "lg", "w-full")}>
+                  continue on {sourceLabel(item.source)} <ArrowUpRight size={17} />
+                </a>
+              ) : (
+                <div className="flex h-12 items-center justify-between border border-line bg-white px-4 text-sm">
+                  <span className="text-muted">{item.type === "read" ? "where to read" : "where to watch"}</span>
+                  <span className="font-mono">{item.source}</span>
+                </div>
+              ))
+            )}
+          </motion.div>
+
+          <div className="min-w-0 flex-[999_1_480px]">
+            <AnimatePresence mode="wait" initial={false}>
+              {!isEdit ? (
+                <motion.div
+                  key="view"
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
+                  variants={stagger(0.07, 0.1)}
+                >
+                  <motion.div variants={fadeUp} className="mb-5 flex flex-wrap gap-2 text-xs">
+                    <span className="bg-ink px-2.5 py-1 text-white">{item.type}</span>
+                    {item.is_completed && <span className="bg-done px-2.5 py-1 text-white">finished</span>}
+                    {(item.category ?? []).map((cat) => (
+                      <span key={cat} className="border border-line px-2.5 py-1 text-body">
+                        {cat}
+                      </span>
+                    ))}
+                  </motion.div>
+
+                  <motion.h1
+                    variants={fadeUp}
+                    className="mb-4 font-serif text-[44px] leading-[1.02] tracking-[-0.025em] break-words sm:text-[60px]"
+                  >
+                    {item.title}
+                  </motion.h1>
+
+                  <motion.p variants={fadeUp} className="mb-9 max-w-xl text-base leading-relaxed text-muted">
+                    {item.description || "no description yet. add a line to remember it by."}
+                  </motion.p>
+
+                  {item.is_completed ? (
+                    <motion.section
+                      variants={fadeUp}
+                      className="flex flex-wrap items-center justify-between gap-6 border border-done/20 bg-done-soft p-6"
+                    >
+                      <div>
+                        <p className="eyebrow mb-2 text-done">finished</p>
+                        <div className="flex items-center gap-3">
+                          <StarDisplay rating={item.rating} size={28} />
+                          <span className="font-serif text-4xl">{item.rating}/5</span>
+                        </div>
+                      </div>
+                      <p className="font-mono text-sm text-body">
+                        {item.last_episode} {unit.plural}
+                      </p>
+                    </motion.section>
+                  ) : (
+                    <motion.section variants={fadeUp} className="border border-line bg-white p-6">
+                      <div className="flex flex-wrap items-end justify-between gap-5">
+                        <div>
+                          <p className="eyebrow mb-1">you're on</p>
+                          <p className="font-serif text-[56px] leading-[0.95] tracking-[-0.02em] sm:text-[68px]">
+                            {unit.long}{" "}
+                            <AnimatedNumber value={item.last_episode} direction={direction} />
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => step(-1)}
+                            aria-label={`one ${unit.long} back`}
+                            className={btn("secondary", "lg", "w-[52px] px-0")}
+                          >
+                            <Minus size={18} />
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => step(1)}
+                            className={btn("primary", "lg")}
+                          >
+                            <Plus size={18} /> 1 {unit.long}
+                          </motion.button>
+                        </div>
+                      </div>
+                      <div className="mt-6 flex flex-wrap gap-x-8 gap-y-2 border-t border-line pt-4 text-sm text-muted">
+                        {item.source && (
+                          <span>
+                            {item.type === "read" ? "reading on" : "watching on"}{" "}
+                            <span className="text-ink">{sourceLabel(item.source)}</span>
+                          </span>
+                        )}
+                        {added && (
+                          <span>
+                            added <span className="text-ink">{added}</span>
+                          </span>
+                        )}
+                        <AnimatePresence>
+                          {log.isSuccess && (
+                            <motion.span
+                              initial={{ opacity: 0, x: -6 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0 }}
+                              className="flex items-center gap-1 text-done"
+                            >
+                              <Check size={14} /> saved
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.section>
+                  )}
+
+                  <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
+                    {item.is_completed ? (
+                      <button type="button" className={btn("secondary", "lg")} onClick={() => setShowUncomplete(true)}>
+                        <RotateCcw size={16} /> back to in progress
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={btn("done", "lg")}
+                        onClick={() => {
+                          setRating(0);
+                          setRatingError("");
+                          setShowComplete(true);
+                        }}
+                      >
+                        <Check size={17} /> mark as finished
+                      </button>
+                    )}
+                    <button type="button" className={btn("secondary", "lg")} onClick={startEdit}>
+                      <Pencil size={15} /> edit
+                    </button>
+                    <button
+                      type="button"
+                      className={btn("ghost", "lg", "text-danger hover:text-danger hover:underline")}
+                      onClick={() => setShowDelete(true)}
+                    >
+                      delete
+                    </button>
+                  </motion.div>
+                </motion.div>
+              ) : (
+                form && (
+                  <motion.form
+                    key="edit"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
+                    transition={{ duration: 0.5, ease: easeOut }}
+                    className="flex flex-col gap-6"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSave();
+                    }}
+                  >
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="bg-ink px-2.5 py-1 text-white">{item.type}</span>
+                      <span className="bg-accent-soft px-2.5 py-1 text-accent">editing</span>
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-title" className="label">title</label>
+                      <input
+                        id="edit-title"
+                        className="field h-14 font-serif text-2xl"
+                        value={form.title}
+                        aria-invalid={!!errors.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      />
+                      {errors.title && <p className="mt-1.5 text-sm text-danger">{errors.title}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-cat" className="label">categories</label>
+                      <TagInput id="edit-cat" value={form.category} onChange={(category) => setForm({ ...form, category })} />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-desc" className="label">description</label>
+                      <textarea
+                        id="edit-desc"
+                        rows={3}
+                        className="field"
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid gap-6 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="edit-source" className="label">
+                          {item.type === "read" ? "where to read" : "where to watch"}
+                        </label>
+                        <input
+                          id="edit-source"
+                          className="field"
+                          value={form.source}
+                          placeholder="a site, an app, or a link"
+                          onChange={(e) => setForm({ ...form, source: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="edit-ep" className="label">
+                          {item.is_completed ? "total" : "last"} {unit.long}
+                        </label>
+                        <input
+                          id="edit-ep"
+                          type="number"
+                          inputMode="numeric"
+                          className="field font-mono"
+                          value={form.last_episode}
+                          aria-invalid={!!errors.lastEpisode}
+                          onChange={(e) => setForm({ ...form, last_episode: e.target.value })}
+                        />
+                        {errors.lastEpisode && <p className="mt-1.5 text-sm text-danger">{errors.lastEpisode}</p>}
+                      </div>
+                    </div>
+
+                    {item.is_completed && (
+                      <div>
+                        <span className="label">rating</span>
+                        <StarPicker value={form.rating} onChange={(r) => setForm({ ...form, rating: r })} />
+                        {errors.rating && <p className="mt-1.5 text-sm text-danger">{errors.rating}</p>}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-3 border-t border-line pt-6">
+                      <button type="submit" disabled={saving} className={btn("primary", "lg")}>
+                        {saving ? "saving…" : "save changes"}
+                      </button>
+                      <button type="button" disabled={saving} className={btn("secondary", "lg")} onClick={cancelEdit}>
+                        cancel
+                      </button>
+                    </div>
+                  </motion.form>
+                )
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+
+      <Modal open={showComplete} onClose={() => !busy && setShowComplete(false)} title="finished it?">
+        <p className="mb-5 text-sm text-muted">rate it out of five. it moves to your finished shelf.</p>
+        <StarPicker
+          value={rating}
+          onChange={(r) => {
+            setRating(r);
+            setRatingError("");
+          }}
+        />
+        <AnimatePresence>
+          {ratingError && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-2 text-sm text-danger"
+            >
+              {ratingError}
+            </motion.p>
+          )}
+        </AnimatePresence>
+        <div className="mt-7 flex gap-3">
+          <button type="button" className={btn("done", "lg")} onClick={confirmComplete} disabled={busy}>
+            {busy ? "saving…" : "mark as finished"}
+          </button>
+          <button type="button" className={btn("secondary", "lg")} onClick={() => setShowComplete(false)} disabled={busy}>
+            not yet
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={showUncomplete} onClose={() => !busy && setShowUncomplete(false)} title="back to in progress?">
+        <p className="mb-7 text-sm text-muted">it returns to your {item.type} shelf. your rating is kept.</p>
+        <div className="flex gap-3">
+          <button type="button" className={btn("primary", "lg")} onClick={confirmUncomplete} disabled={busy}>
+            {busy ? "moving…" : "yes, move it back"}
+          </button>
+          <button type="button" className={btn("secondary", "lg")} onClick={() => setShowUncomplete(false)} disabled={busy}>
+            cancel
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={showDelete} onClose={() => !busy && setShowDelete(false)} title="delete this title?" tone="danger">
+        <p className="mb-7 text-sm text-muted">
+          “{item.title}” and its cover will be removed from your shelf. this can't be undone.
+        </p>
+        <div className="flex gap-3">
+          <button type="button" className={btn("danger", "lg")} onClick={handleDelete} disabled={busy}>
+            {busy ? "deleting…" : "delete"}
+          </button>
+          <button type="button" className={btn("secondary", "lg")} onClick={() => setShowDelete(false)} disabled={busy}>
+            keep it
+          </button>
+        </div>
+      </Modal>
+    </div>
   );
 };
 
-export default Edit;
+export default Card;

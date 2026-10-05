@@ -1,22 +1,37 @@
 import axios from "axios";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
-import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { AnimatePresence, motion } from "motion/react";
+import { ImageUp, Lock, RotateCcw } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import {
-  getUserData,
   uploadImageProfile,
   editProfileData,
   deleteAccount,
   deleteImageProfile,
 } from "../../services/profile.service";
 import LoadingScreen from "../../components/ui/LoadingScreen";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
-import "../../styles/animations.css";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
+import Modal from "../../components/ui/Modal";
+import OtpInput from "../../components/ui/OtpInput";
+import { FormError } from "../../components/auth/AuthLayout";
+import { easeOut, fadeUp, stagger } from "../../lib/motion";
+import { btn } from "../../lib/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { useProfile } from "../../hooks/useProfile";
+
+const SECTIONS = [
+  { id: "profile", label: "profile" },
+  { id: "email", label: "email" },
+  { id: "password", label: "password" },
+  { id: "session", label: "sign out" },
+  { id: "danger", label: "delete account" },
+];
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
@@ -35,6 +50,7 @@ const EditProfile = () => {
   const [email, setEmail] = useState("");
   const [oldEmail, setOldEmail] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
 
   const hasPassword = user?.passwordEnabled;
 
@@ -48,16 +64,13 @@ const EditProfile = () => {
 
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user?.id) throw new Error("No user id");
-      return getUserData(user.id);
-    },
-    enabled: !!isLoaded && !!user?.id,
-  });
+  const { data: profile, isLoading: profileLoading, missing } = useProfile();
 
-  const pageLoading = !isLoaded || profileLoading;
+  const pageLoading = !isLoaded || profileLoading || missing;
+
+  useEffect(() => {
+    document.title = "settings · plotify";
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -69,32 +82,13 @@ const EditProfile = () => {
     setOldEmail(profile.email);
   }, [profile]);
 
-  useEffect(() => {
-    const root = containerRef.current;
-    if (!root || pageLoading) return;
-
-    const elements = root.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
-
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [pageLoading, emailVerification]);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const selected = e.target.files?.[0];
     if (!selected) return;
 
     setFile(selected);
+    setDelProfilePic(false);
     setPreview(URL.createObjectURL(selected));
   };
 
@@ -102,6 +96,7 @@ const EditProfile = () => {
 
   const handleUpload = async () => {
     setEditLoading(true);
+    setError(null);
 
     if (!fullname || !username || !email) {
       setError("please fill in all fields");
@@ -166,7 +161,9 @@ const EditProfile = () => {
       navigate("/profile");
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message);
+        setError(err.response?.data?.message ?? "something went wrong");
+      } else {
+        setError("something went wrong");
       }
       setEditLoading(false);
     } finally {
@@ -176,6 +173,7 @@ const EditProfile = () => {
 
   const verifyCode = async () => {
     try {
+      setVerifyError("");
       if (!emailAddressClerk) return;
       const result = await emailAddressClerk.attemptVerification({
         code: code,
@@ -192,9 +190,6 @@ const EditProfile = () => {
       await user?.reload();
       const latestEmail = user?.primaryEmailAddress?.emailAddress;
 
-      console.log("fullname: ", fullname);
-      console.log("username: ", username);
-
       await editProfileData({
         fullname,
         username,
@@ -203,9 +198,14 @@ const EditProfile = () => {
         token,
       });
 
+      await queryClient.invalidateQueries({
+        queryKey: ["profile", user?.id],
+      });
+
       navigate("/profile");
     } catch (error) {
       console.log(error);
+      setVerifyError("that code didn't work. check it and try again.");
     }
   };
 
@@ -227,212 +227,305 @@ const EditProfile = () => {
     }
   };
 
+  const loggingOut = async () => {
+    try {
+      await signOut({ redirectUrl: "/signin" });
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   if (pageLoading) {
     return <LoadingScreen />;
   }
 
+  const avatarSrc = preview ?? (delProfilePic ? null : currImage);
+  const initial = (fullname || username || "·").charAt(0).toLowerCase();
+
   return (
-    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
+    <div className="flex min-h-screen flex-col bg-paper text-ink lowercase">
       {deleteLoading && <LoadingScreen />}
+      <Navbar />
 
-      {confirmationDelete && (
-        <div className="modal-overlay">
-          <div className="modal-panel flex flex-col items-center gap-4 text-center">
-            <p>are you sure to delete your account?</p>
-            <p className="text-xs text-gray-400">
-              this permanently removes your profile and all saved items.
-            </p>
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 pt-10 pb-24 sm:px-10">
+        <Breadcrumbs items={[{ label: "profile", to: "/profile" }, { label: "settings" }]} />
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: easeOut }}
+          className="mb-10 font-serif text-[48px] leading-none tracking-[-0.025em] sm:text-[56px]"
+        >
+          settings
+        </motion.h1>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className="action-btn-danger"
-                onClick={handleDeleteAccount}
+        <AnimatePresence mode="wait">
+          {emailVerification ? (
+            <motion.section
+              key="verify"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.5, ease: easeOut }}
+              className="max-w-md border border-line bg-white p-7"
+            >
+              <p className="eyebrow mb-2">confirm your new email</p>
+              <h2 className="mb-2 font-serif text-3xl">check your inbox.</h2>
+              <p className="mb-6 text-sm text-muted">
+                we sent a 6-digit code to <span className="text-ink">{email}</span>.
+              </p>
+              <form
+                className="flex flex-col gap-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  verifyCode();
+                }}
               >
-                yes
-              </button>
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => setConfirmationDelete(false)}
-              >
-                no
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="landing-ambient" aria-hidden="true" />
-
-      <div ref={containerRef} className="relative z-10">
-        <title>edit profile</title>
-
-        <div className="mx-auto flex max-w-5xl flex-col items-center px-6 py-16 sm:px-10 lg:py-24">
-          {!emailVerification ? (
-            <>
-              <div className="reveal mb-10 flex flex-col items-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="fileInput"
-                  name="profile_image"
-                  hidden
-                  onChange={handleFileChange}
-                />
-                <label
-                  htmlFor="fileInput"
-                  className="landing-card group relative block h-60 w-60 cursor-pointer overflow-hidden bg-[#f7f6f3]"
-                >
-                  {preview && !error ? (
-                    <img
-                      src={preview}
-                      alt="preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : currImage ? (
-                    delProfilePic ? (
-                      <img
-                        src="default-profile-pic.png"
-                        alt="profile"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src={currImage}
-                        alt="profile"
-                        className="h-full w-full object-cover"
-                      />
-                    )
-                  ) : (
-                    <img
-                      src="default-profile-pic.png"
-                      alt="profile"
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-4 text-center text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                    {currImage
-                      ? delProfilePic
-                        ? "upload new profile"
-                        : "change profile pic"
-                      : "upload new profile"}
-                  </div>
-                </label>
-
-                {currImage ? (
+                <OtpInput value={code} onChange={setCode} invalid={!!verifyError} />
+                <FormError message={verifyError} />
+                <div className="flex gap-3">
+                  <button type="submit" disabled={code.length < 6} className={btn("primary", "lg")}>
+                    verify email
+                  </button>
                   <button
                     type="button"
-                    className={`mt-4 ${delProfilePic ? "action-btn" : "action-btn-danger"}`}
-                    onClick={() => setDelProfilePic(!delProfilePic)}
+                    className={btn("secondary", "lg")}
+                    onClick={() => {
+                      setEmailVerification(false);
+                      setEmail(oldEmail);
+                      setCode("");
+                    }}
                   >
-                    {delProfilePic
-                      ? "restore profile pic"
-                      : "delete profile picture"}
+                    cancel
                   </button>
-                ) : (
-                  ""
-                )}
-
-                {error && <p className="field-error mt-5">{error}</p>}
-              </div>
-
-              <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
-                <input
-                  type="text"
-                  className="field-input"
-                  placeholder="full name"
-                  value={fullname}
-                  onChange={(e) => setFullname(e.target.value)}
-                />
-
-                <input
-                  type="text"
-                  className="field-input"
-                  placeholder="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-
-                <div className="group relative w-full">
-                  <input
-                    type="email"
-                    disabled={!hasPassword}
-                    className={`field-input ${!hasPassword ? "cursor-not-allowed bg-[#f7f6f3] opacity-60" : ""}`}
-                    placeholder="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-
-                  {!hasPassword && (
-                    <div className="pointer-events-none absolute bottom-[110%] left-0 mb-2 w-max max-w-[280px] border border-[#eaeaea] bg-[#f7f6f3] px-3 py-2 text-xs text-gray-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                      signed in using google account, email cannot be changed
-                    </div>
-                  )}
                 </div>
+              </form>
+            </motion.section>
+          ) : (
+            <motion.div
+              key="settings"
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0 }}
+              variants={stagger(0.07, 0.05)}
+              className="flex flex-wrap items-start gap-x-16 gap-y-8"
+            >
+              <motion.nav
+                variants={fadeUp}
+                aria-label="settings sections"
+                className="flex w-full flex-row flex-wrap gap-1 text-[15px] lg:sticky lg:top-8 lg:w-56 lg:flex-col"
+              >
+                {SECTIONS.filter((s) => s.id !== "password" || hasPassword).map((s) => (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    className={`border-l-2 border-transparent px-3.5 py-2.5 transition-colors hover:border-line-strong hover:bg-white ${
+                      s.id === "danger" ? "text-danger" : "text-body hover:text-ink"
+                    }`}
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </motion.nav>
 
-                <p className="hidden text-green-400">
-                  verification email was sent! <br /> please check your email.
-                </p>
+              <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-6">
+                <motion.form
+                  variants={fadeUp}
+                  id="profile"
+                  className="scroll-mt-8 border border-line bg-white p-6 sm:p-7"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleUpload();
+                  }}
+                >
+                  <h2 className="mb-1 font-serif text-[26px]">profile</h2>
+                  <p className="mb-6 text-sm text-muted">how your name appears around plotify.</p>
 
-                <div className="mt-6 flex flex-col gap-4 border-t border-[#eaeaea] pt-6">
-                  {!editLoading && (
-                    <>
+                  <div className="mb-6 flex flex-wrap items-center gap-4">
+                    <label
+                      htmlFor="fileInput"
+                      className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden bg-[#3b4a3f] font-serif text-4xl text-white"
+                    >
+                      <AnimatePresence mode="wait">
+                        {avatarSrc ? (
+                          <motion.img
+                            key={avatarSrc}
+                            src={avatarSrc}
+                            alt="profile"
+                            className="h-full w-full object-cover"
+                            initial={{ opacity: 0, scale: 1.1 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                          />
+                        ) : (
+                          <motion.span key="initial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                            {initial}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                      <span className="absolute inset-0 flex items-center justify-center bg-ink/55 opacity-0 transition-opacity group-hover:opacity-100">
+                        <ImageUp size={20} />
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="fileInput"
+                        name="profile_image"
+                        className="sr-only"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                    <label htmlFor="fileInput" className={btn("secondary", "md", "cursor-pointer")}>
+                      upload new photo
+                    </label>
+                    {currImage && !file && (
                       <button
                         type="button"
-                        className="action-btn-danger w-fit"
-                        onClick={() => setConfirmationDelete(true)}
+                        className={btn("ghost", "md", delProfilePic ? "" : "hover:text-danger")}
+                        onClick={() => setDelProfilePic(!delProfilePic)}
                       >
-                        delete account
-                      </button>
-                      <p className="text-xs text-gray-400">
-                        permanent action. all saved screen and read entries will be removed.
-                      </p>
-                    </>
-                  )}
-
-                  <div className="flex gap-3">
-                    {!editLoading && (
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => navigate(-1)}
-                      >
-                        cancel
+                        {delProfilePic ? (
+                          <>
+                            <RotateCcw size={14} /> keep photo
+                          </>
+                        ) : (
+                          "remove"
+                        )}
                       </button>
                     )}
+                  </div>
 
-                    <button
-                      type="button"
-                      className={`action-btn ${editLoading ? "cursor-not-allowed opacity-50" : ""}`}
-                      onClick={handleUpload}
-                      disabled={editLoading}
-                    >
-                      {editLoading ? "processing..." : "save"}
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="set-name" className="label">full name</label>
+                      <input
+                        id="set-name"
+                        type="text"
+                        autoComplete="name"
+                        className="field"
+                        value={fullname}
+                        onChange={(e) => setFullname(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="set-user" className="label">username</label>
+                      <div className="flex h-12 border border-line-strong bg-white transition-[border-color,box-shadow] focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(23_22_15/0.06)]">
+                        <span className="flex items-center pr-1 pl-3.5 text-muted">@</span>
+                        <input
+                          id="set-user"
+                          type="text"
+                          autoComplete="username"
+                          className="min-w-0 flex-1 bg-transparent pr-3.5 text-[15px] outline-none"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                        />
+                      </div>
+                      <p className="hint">no spaces.</p>
+                    </div>
+                    <div id="email" className="scroll-mt-8 sm:col-span-2">
+                      <label htmlFor="set-email" className="label">email</label>
+                      <input
+                        id="set-email"
+                        type="email"
+                        autoComplete="email"
+                        readOnly={!hasPassword}
+                        className="field sm:max-w-md"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      <p className="hint flex items-center gap-1.5">
+                        {hasPassword ? (
+                          "changing it sends a code to the new address first."
+                        ) : (
+                          <>
+                            <Lock size={13} /> you signed in with google, so this email is managed by your google account.
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <FormError message={error ?? ""} />
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button type="submit" disabled={editLoading} className={btn("primary", "md")}>
+                      {editLoading ? "saving…" : "save changes"}
+                    </button>
+                    <button type="button" disabled={editLoading} className={btn("secondary", "md")} onClick={() => navigate(-1)}>
+                      cancel
                     </button>
                   </div>
-                </div>
+                </motion.form>
+
+                {hasPassword && (
+                  <motion.section
+                    variants={fadeUp}
+                    id="password"
+                    className="flex scroll-mt-8 flex-wrap items-center gap-x-6 gap-y-4 border border-line bg-white p-6 sm:p-7"
+                  >
+                    <div className="flex-[1_1_260px]">
+                      <h2 className="mb-1 font-serif text-[26px]">password</h2>
+                      <p className="text-sm text-muted">we'll ask for your current password, then a new one.</p>
+                    </div>
+                    <Link to="/changepassword" className={btn("secondary", "md")}>change password</Link>
+                  </motion.section>
+                )}
+
+                <motion.section
+                  variants={fadeUp}
+                  id="session"
+                  className="flex scroll-mt-8 flex-wrap items-center gap-x-6 gap-y-4 border border-line bg-white p-6 sm:p-7"
+                >
+                  <div className="flex-[1_1_260px]">
+                    <h2 className="mb-1 font-serif text-[26px]">sign out</h2>
+                    <p className="text-sm text-muted">your shelves stay exactly as they are.</p>
+                  </div>
+                  <button type="button" className={btn("secondary", "md", "border-ink")} onClick={loggingOut}>
+                    sign out of this device
+                  </button>
+                </motion.section>
+
+                <motion.section
+                  variants={fadeUp}
+                  id="danger"
+                  className="scroll-mt-8 border border-[#e3b7b5] bg-danger-soft p-6 sm:p-7"
+                >
+                  <h2 className="mb-1 font-serif text-[26px] text-danger">delete account</h2>
+                  <p className="mb-5 max-w-xl text-sm leading-relaxed text-body">
+                    permanently removes your profile and every screen and read entry, including covers and ratings. this
+                    can't be undone.
+                  </p>
+                  <button type="button" className={btn("danger", "md")} onClick={() => setConfirmationDelete(true)}>
+                    delete my account…
+                  </button>
+                </motion.section>
               </div>
-            </>
-          ) : (
-            <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
-              <input
-                type="text"
-                placeholder="verification code"
-                className="field-input"
-                onChange={(e) => setCode(e.target.value)}
-              />
-
-              <button type="button" className="action-btn w-fit" onClick={verifyCode}>
-                verify email
-              </button>
-            </div>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
+      </main>
 
-        <Footer />
-      </div>
+      <Footer />
+
+      <Modal
+        open={confirmationDelete}
+        onClose={() => !deleteLoading && setConfirmationDelete(false)}
+        title="delete your account?"
+        tone="danger"
+      >
+        <p className="mb-7 text-sm leading-relaxed text-muted">
+          this permanently removes your profile and all saved items. there's no way to bring them back.
+        </p>
+        <div className="flex gap-3">
+          <button type="button" className={btn("danger", "lg")} onClick={handleDeleteAccount} disabled={deleteLoading}>
+            yes, delete everything
+          </button>
+          <button type="button" className={btn("secondary", "lg")} onClick={() => setConfirmationDelete(false)}>
+            keep my account
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 };
