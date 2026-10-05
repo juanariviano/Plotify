@@ -1,24 +1,24 @@
 import { useNavigate } from "react-router";
 import { useUser, useReverification } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { Check } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ClerkError } from "../../types/auth";
-import { Eye, EyeOff } from "lucide-react";
-import LoadingScreen from "../../components/ui/LoadingScreen";
+import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
-import "../../styles/animations.css";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
+import PasswordInput from "../../components/ui/PasswordInput";
+import { FormError } from "../../components/auth/AuthLayout";
+import { PageEnter } from "../../components/motion";
+import { btn } from "../../lib/ui";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
-  const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [showOldPassword, setShowOldPassword] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -26,24 +26,8 @@ const ChangePassword = () => {
   const [changes, setChanges] = useState(false);
 
   useEffect(() => {
-    const root = containerRef.current;
-    if (!root || loading) return;
-
-    const elements = root.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
-
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [loading]);
+    document.title = "change password · plotify";
+  }, []);
 
   const updatePasswordWithReverification = useReverification(async () => {
     await user?.updatePassword({
@@ -79,112 +63,94 @@ const ChangePassword = () => {
       setConfirmPassword("");
     } catch (err: unknown) {
       console.log(err);
-      setLoading(false);
 
       const clerkError = err as ClerkError;
 
       setError(
-        clerkError.errors?.[0]?.longMessage || "failed to change password",
+        (clerkError.errors?.[0]?.longMessage || "failed to change password").toLowerCase(),
       );
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
   return (
-    <div className="relative min-h-screen bg-white lowercase text-[#111111]">
-      <div className="landing-ambient" aria-hidden="true" />
+    <div className="flex min-h-screen flex-col bg-paper text-ink lowercase">
+      <Navbar />
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 pt-10 pb-24 sm:px-10">
+        <Breadcrumbs
+          items={[
+            { label: "profile", to: "/profile" },
+            { label: "settings", to: "/editprofile" },
+            { label: "password" },
+          ]}
+        />
+        <PageEnter className="max-w-xl">
+          <h1 className="mb-2 font-serif text-[48px] leading-none tracking-[-0.025em]">change password</h1>
+          <p className="mb-9 text-muted">other devices will be signed out once it's changed.</p>
 
-      <div ref={containerRef} className="relative z-10 flex min-h-screen flex-col">
-        <title>change password</title>
-
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10">
-          <div className="reveal flex w-full max-w-[350px] flex-col gap-3">
-            <span className="mb-4 inline-block w-fit border border-[#eaeaea] bg-[#f7f6f3] px-3 py-1 text-[10px] tracking-[0.08em] text-gray-400">
-              security
-            </span>
-
-            <h1 className="mb-6 text-2xl font-bold sm:text-[26px]">change password</h1>
-
-            <div className="relative w-full">
-              <input
-                type={showOldPassword ? "text" : "password"}
-                className="field-input pr-12"
+          <form
+            className="flex flex-col gap-5 border border-line bg-white p-6 sm:p-8"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleChangePassword();
+            }}
+          >
+            <div>
+              <label htmlFor="cp-current" className="label">current password</label>
+              <PasswordInput
+                id="cp-current"
+                autoComplete="current-password"
                 value={currentPassword}
-                placeholder="old password"
                 onChange={(e) => setCurrentPassword(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => setShowOldPassword(!showOldPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-              >
-                {showOldPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
             </div>
-
-            <div className="relative w-full">
-              <input
-                type={showPassword ? "text" : "password"}
-                className="field-input pr-12"
+            <div>
+              <label htmlFor="cp-new" className="label">new password</label>
+              <PasswordInput
+                id="cp-new"
+                autoComplete="new-password"
                 value={newPassword}
-                placeholder="new password"
                 onChange={(e) => setNewPassword(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-              >
-                {showPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
             </div>
-
-            <div className="relative w-full">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                className="field-input pr-12"
+            <div>
+              <label htmlFor="cp-confirm" className="label">confirm new password</label>
+              <PasswordInput
+                id="cp-confirm"
+                autoComplete="new-password"
                 value={confirmPassword}
-                placeholder="confirm password"
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-              >
-                {showConfirmPassword ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
             </div>
 
-            {error && <p className="field-error">{error}</p>}
-            {success && <p className="text-sm text-gray-400">{success}</p>}
+            <FormError message={error} />
+            <AnimatePresence>
+              {success && (
+                <motion.p
+                  role="status"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2 border-l-2 border-done bg-done-soft px-3 py-2 text-sm text-done"
+                >
+                  <Check size={15} /> {success}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => navigate(-1)}
-              >
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button type="submit" disabled={loading} className={btn("primary", "lg")}>
+                {loading ? "saving…" : "save new password"}
+              </button>
+              <button type="button" className={btn("secondary", "lg")} onClick={() => navigate(-1)}>
                 {changes ? "back" : "cancel"}
               </button>
-              <button
-                type="button"
-                className="action-btn"
-                onClick={handleChangePassword}
-              >
-                save
-              </button>
             </div>
-          </div>
-        </div>
-
-        <Footer />
-      </div>
+          </form>
+        </PageEnter>
+      </main>
+      <Footer />
     </div>
   );
 };
