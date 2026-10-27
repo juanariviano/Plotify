@@ -8,6 +8,7 @@ import type {
   UpdateMediaPayload,
   Media,
 } from "../types/media";
+import type { ExternalMedia } from "../types/chat";
 
 type GetMediaParams = {
   token: string;
@@ -88,6 +89,21 @@ export const uploadThumbnail = async ({
   );
 
   return res.data.image_url;
+};
+
+export const lookupMedia = async (
+  token: string,
+  q: string,
+  type: "screen" | "read",
+): Promise<ExternalMedia[]> => {
+  const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/media/lookup`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params: { q, type },
+  });
+
+  return res.data;
 };
 
 export const createMedia = async ({ token, mediaData }: AddMediaPayload) => {

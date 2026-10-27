@@ -1,11 +1,11 @@
 import axios from "axios";
 import type { EditProfilePayload } from "../types/profile";
 
-export const getUserData = async (clerkId: string | null) => {
+export const getUserData = async (token: string | null) => {
   try {
     const res = await axios.get(
       `${import.meta.env.VITE_BACKEND_URL}/auth/user`,
-      { params: { clerkId } },
+      { headers: { Authorization: `Bearer ${token}` } },
     );
 
     return res.data;
@@ -51,14 +51,12 @@ export const deleteImageProfile = async (
 export const editProfileData = async ({
   fullname,
   username,
-  email,
-  clerkId,
   token,
 }: EditProfilePayload) => {
   try {
     await axios.put(
       `${import.meta.env.VITE_BACKEND_URL}/profile/edit`,
-      { fullname, username, email, clerkId },
+      { fullname, username },
       { headers: { Authorization: `Bearer ${token}` } },
     );
   } catch (error) {

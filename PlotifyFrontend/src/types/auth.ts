@@ -7,6 +7,6 @@ export type ClerkError = {
 export type CompleteProfilePayload = {
   fullname: string
   username: string
-  clerkId: string | null | undefined
+  token: string | null
   // email: string | undefined
 }

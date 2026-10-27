@@ -4,7 +4,8 @@ import { clerkClient } from "@clerk/express";
 import { getAuth } from "@clerk/express";
 
 import { handleUpload } from "../middleware/upload.js";
-import { uploadImage } from "../utils/storageHelper.js";
+import { uploadImage, removeImage } from "../utils/storageHelper.js";
+import { validateName } from "../utils/validate.js";
 
 const router = express.Router();
 
@@ -12,6 +13,7 @@ const router = express.Router();
 /**
  * upload profile picture ke storage supabase, baru dapetin public linknya
  * terus simpen ke tabel users (update) berdasarkan user_id
+ * foto lama diambil dari database (bukan dari body) lalu dihapus
  */
 router.post(
   "/upload-profile-image",
@@ -19,11 +21,13 @@ router.post(
   async (req, res) => {
     // controller
     try {
-      const url = await uploadImage(
-        req.file,
-        "profile",
-        req.body.old_image_url,
-      );
+      const { data: profileData } = await supabase
+        .from("users")
+        .select("profile_image_url")
+        .eq("id", req.userId)
+        .single();
+
+      const url = await uploadImage(req.file, "profile", req.userId);
 
       // update profile image
       const { error: updateError } = await supabase
@@ -31,12 +35,15 @@ router.post(
         .update({ profile_image_url: url })
         .eq("id", req.userId);
 
-      if (updateError) {
-        return res.status(500).json({ message: updateError.message });
+      if (updateError) throw updateError;
+
+      if (profileData?.profile_image_url) {
+        await removeImage(profileData.profile_image_url);
       }
 
       res.status(200).json({ profile_image_url: url });
     } catch (error) {
+      console.log(error);
       res.status(500).json({ message: "Server error" });
     }
   },
@@ -44,41 +51,43 @@ router.post(
 
 // edit profile
 /**
- * buat edit profile berdasarkan username
- * username disini itu tidak boleh sama 
+ * buat edit profile user yang sedang login
+ * username disini itu tidak boleh sama
+ * email tidak diambil dari body, tapi dari primary email di clerk (yang sudah diverifikasi)
  */
 router.put("/edit", async (req, res) => {
-  const { fullname, username, email, clerkId } = req.body;
+  const { fullname, username } = req.body;
+
+  const invalid = validateName({ fullname, username });
+  if (invalid) return res.status(400).json({ message: invalid });
 
   try {
-    const { data: checkData, error: checkError } = await supabase
+    const { data: checkData } = await supabase
       .from("users")
-      .select()
+      .select("id")
       .eq("username", username)
-      .neq("clerk_id", clerkId)
-      .single();
+      .neq("id", req.userId)
+      .maybeSingle();
 
     if (checkData) {
-      if (checkData.username === username) {
-        return res.status(409).json({ message: "username already in use" });
-      }
+      return res.status(409).json({ message: "username already in use" });
     }
+
+    const { userId: clerkId } = getAuth(req);
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    const email = clerkUser.primaryEmailAddress?.emailAddress;
 
     const { data, error } = await supabase
       .from("users")
-      .update({ fullname, username, email })
+      .update({ fullname, username, ...(email ? { email } : {}) })
       .eq("id", req.userId)
-      .select();
+      .select("username, fullname, profile_image_url, email");
 
-    console.log("email: ", email)
-    console.log(data);
-
-    if (error) {
-      return res.status(501).json({ Error: error });
-    }
+    if (error) throw error;
 
     res.status(200).json(data);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -99,8 +108,7 @@ router.delete("/deleteprofilepic", async (req, res) => {
 
     // hapus dari storage kalau ada
     if (profileData?.profile_image_url) {
-      const oldPath = profileData.profile_image_url.split("/plotify/")[1];
-      await supabase.storage.from("plotify").remove([oldPath]);
+      await removeImage(profileData.profile_image_url);
     }
 
     // hapus dari database
@@ -108,11 +116,12 @@ router.delete("/deleteprofilepic", async (req, res) => {
       .from("users")
       .update({ profile_image_url: null })
       .eq("id", req.userId)
-      .select();
+      .select("username, fullname, profile_image_url, email");
 
-    if (error) return res.status(500).json({ error });
+    if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -134,28 +143,24 @@ router.delete("/delete", async (req, res) => {
 
     // hapus profile image dari storage kalau ada
     if (userData?.profile_image_url) {
-      const oldPath = userData.profile_image_url.split("/plotify/")[1];
-      await supabase.storage.from("plotify").remove([oldPath]);
+      await removeImage(userData.profile_image_url);
     }
 
     // hapus user di clerk
     await clerkClient.users.deleteUser(clerkId);
 
     // hapus data user di supabase
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("users")
       .delete()
-      .eq("id", req.userId)
-      .select();
+      .eq("id", req.userId);
 
-    if (error) {
-      return res.status(500).json({ error });
-    }
+    if (error) throw error;
 
     res.json({ message: "Account deleted successfully" });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ error: err });
+    res.status(500).json({ message: "Server error" });
   }
 });
 

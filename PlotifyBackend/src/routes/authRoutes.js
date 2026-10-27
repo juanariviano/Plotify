@@ -1,19 +1,23 @@
 import express from "express";
 import { supabase } from "../supabase-client.js";
+import { validateName } from "../utils/validate.js";
 
 const router = express.Router();
 
+// clerk_id selalu diambil dari token login (req.auth), bukan dari query/body,
+// supaya user tidak bisa membaca atau mengubah data user lain
+
 // get user data
 /**
- * dapetin data user berdasarkan clerk_id
+ * dapetin data user yang sedang login berdasarkan clerk_id
  */
 router.get("/user", async (req, res) => {
   try {
-    const { clerkId } = req.query;
+    const { userId: clerkId } = req.auth();
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("users")
-      .select()
+      .select("username, fullname, profile_image_url, email")
       .eq("clerk_id", clerkId)
       .single();
 
@@ -35,33 +39,33 @@ router.get("/user", async (req, res) => {
  * kalo usernamenya ada -> error
  */
 router.post("/completeprofile", async (req, res) => {
-  const { fullname, username, clerkId } = req.body;
+  const { fullname, username } = req.body;
+  const { userId: clerkId } = req.auth();
+
+  const invalid = validateName({ fullname, username });
+  if (invalid) return res.status(400).json({ message: invalid });
 
   try {
-    const { data: checkData, error: checkError } = await supabase
+    const { data: checkData } = await supabase
       .from("users")
-      .select()
+      .select("id")
       .eq("username", username)
-      .single();
+      .neq("clerk_id", clerkId)
+      .maybeSingle();
 
     if (checkData) {
-      if (checkData.username === username) {
-        return res.status(409).json({ message: "username already in use" });
-      }
+      return res.status(409).json({ message: "username already in use" });
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("users")
       .update({ fullname, username, profile_completed: true })
-      .eq("clerk_id", clerkId)
-      .select();
+      .eq("clerk_id", clerkId);
 
     if (error) {
-      return res.status(400).json({ message: error.message });
+      console.log(error);
+      return res.status(400).json({ message: "failed to complete profile" });
     }
-
-    console.log("data", data);
-    console.log("err", error);
 
     res.json({ message: "profile completed succesfully" });
   } catch (error) {

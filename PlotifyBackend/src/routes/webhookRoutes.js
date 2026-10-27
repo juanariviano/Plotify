@@ -7,6 +7,11 @@ const router = express.Router();
 router.post("/clerk", async (req, res) => {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
+  if (!WEBHOOK_SECRET) {
+    console.error("Missing CLERK_WEBHOOK_SECRET");
+    return res.status(500).json({ error: "Webhook not configured" });
+  }
+
   // Verifikasi webhook dari Clerk
   const wh = new Webhook(WEBHOOK_SECRET);
   let body;
@@ -22,8 +27,15 @@ router.post("/clerk", async (req, res) => {
     return res.status(400).json({ error: "Invalid webhook" });
   }
 
-  const { id, email_addresses } = body.data;
-  const email = email_addresses[0].email_address;
+  // hanya event user.created yang diproses, event lain (user.updated, session.*, dll) diabaikan
+  if (body.type !== "user.created") {
+    return res.status(200).json({ message: "Event ignored" });
+  }
+
+  const { id, email_addresses, primary_email_address_id } = body.data;
+  const email = (
+    email_addresses?.find((e) => e.id === primary_email_address_id) ?? email_addresses?.[0]
+  )?.email_address;
 
   try {
     const { data, error } = await supabase
@@ -37,7 +49,7 @@ router.post("/clerk", async (req, res) => {
 
     if (error) {
       console.log("Supabase error:", error);
-      return res.status(500).json({ error });
+      return res.status(500).json({ error: "Failed to create user" });
     }
 
     res.status(200).json({ message: "User created" });
