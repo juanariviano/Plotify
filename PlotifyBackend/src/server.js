@@ -33,7 +33,17 @@ app.use(
   }),
 );
 
-app.use(clerkMiddleware());
+// token yang rusak/tidak valid membuat clerk melempar error → balas 401, bukan 500
+const clerk = clerkMiddleware();
+app.use((req, res, next) =>
+  clerk(req, res, (err) => {
+    if (err) {
+      console.error("clerk auth error:", err.message);
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    next();
+  }),
+);
 
 // Clerk webhooks need the raw body buffer for signature verification
 app.use("/webhooks", express.raw({ type: "application/json" }));

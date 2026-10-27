@@ -1,5 +1,12 @@
-import { requireAuth } from "@clerk/express";
+import { getAuth } from "@clerk/express";
 
-const authMiddleware = requireAuth();
+// balas 401 untuk request tanpa login, bukan redirect seperti requireAuth()
+const authMiddleware = (req, res, next) => {
+  const { userId } = getAuth(req);
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+};
 
 export default authMiddleware;
