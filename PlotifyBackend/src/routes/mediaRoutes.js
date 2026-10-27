@@ -81,6 +81,69 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ringkasan profil
+/**
+ * semua angka untuk halaman profil dalam satu request:
+ * total per rak, 4 yang sedang berjalan, 3 favorit, sebaran rating, kategori teratas
+ */
+router.get("/stats", async (req, res) => {
+  try {
+    const [all, ongoing, favourites] = await Promise.all([
+      // kolom ringan saja untuk dihitung; ikut batas max rows supabase (default 1000)
+      supabase
+        .from("media")
+        .select("type, is_completed, rating, category")
+        .eq("user_id", req.userId),
+      supabase
+        .from("media")
+        .select(MEDIA_FIELDS)
+        .eq("user_id", req.userId)
+        .eq("is_completed", false)
+        .order("created_at", { ascending: false })
+        .limit(4),
+      supabase
+        .from("media")
+        .select(MEDIA_FIELDS)
+        .eq("user_id", req.userId)
+        .eq("is_completed", true)
+        .order("rating", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+
+    const error = all.error || ongoing.error || favourites.error;
+    if (error) throw error;
+
+    const rows = all.data;
+    const finished = rows.filter((m) => m.is_completed);
+
+    const counts = {};
+    for (const m of rows) {
+      for (const c of m.category ?? []) counts[c] = (counts[c] ?? 0) + 1;
+    }
+
+    res.status(200).json({
+      totals: {
+        ongoing: rows.length - finished.length,
+        finished: finished.length,
+        screenFinished: finished.filter((m) => m.type === "screen").length,
+        readFinished: finished.filter((m) => m.type === "read").length,
+      },
+      ongoing: ongoing.data,
+      favourites: favourites.data,
+      ratings: [5, 4, 3, 2, 1].map((stars) => ({
+        stars,
+        count: finished.filter((m) => Math.round(m.rating) === stars).length,
+      })),
+      categories: Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // cari judul di database luar (TMDB / AniList / Open Library)
 /**
  * query: q (judul), type (screen | read)
@@ -243,6 +306,20 @@ router.put("/update/:id", async (req, res) => {
   if (invalid) return res.status(400).json({ message: invalid });
 
   try {
+    const mediaId = parseInt(id, 10);
+
+    // cover lama diambil dari database supaya bisa dibuang kalau diganti / dihapus
+    let oldImage = null;
+    if (image_url !== undefined) {
+      const { data: current } = await supabase
+        .from("media")
+        .select("image_url")
+        .eq("id", mediaId)
+        .eq("user_id", req.userId)
+        .single();
+      oldImage = current?.image_url ?? null;
+    }
+
     const updateData = {
       source,
       last_episode,
@@ -264,11 +341,15 @@ router.put("/update/:id", async (req, res) => {
     const { data, error } = await supabase
       .from("media")
       .update(updateData)
-      .eq("id", parseInt(id, 10))
+      .eq("id", mediaId)
       .eq("user_id", req.userId)
       .select(MEDIA_FIELDS);
 
     if (error) throw error;
+
+    if (data[0] && oldImage && oldImage !== image_url) {
+      await removeOwnImage(oldImage, req.userId);
+    }
 
     // embedding hanya perlu dihitung ulang kalau teks yang di-embed berubah
     const textChanged = [title, description, category].some((v) => v !== undefined);
