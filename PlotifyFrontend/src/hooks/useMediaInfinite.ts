@@ -1,51 +1,20 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
-import { getMediaData } from "../services/media.service";
-
-const DEFAULT_PAGE_SIZE = 20;
+import { DEFAULT_PAGE_SIZE, mediaListOptions, type Shelf } from "../lib/queries";
 
 export { DEFAULT_PAGE_SIZE };
 
 type UseMediaInfiniteOptions = {
-  type: "screen" | "read";
+  type: Shelf;
   isCompleted: boolean;
   search?: string;
   pageSize?: number;
 };
 
-export const useMediaInfinite = ({
-  type,
-  isCompleted,
-  search = "",
-  pageSize = DEFAULT_PAGE_SIZE,
-}: UseMediaInfiniteOptions) => {
-  const { getToken } = useAuth();
+export const useMediaInfinite = ({ type, isCompleted, search = "", pageSize }: UseMediaInfiniteOptions) => {
+  const { userId, getToken } = useAuth();
 
-  const query = useInfiniteQuery({
-    queryKey: ["media", type, isCompleted, search],
-    queryFn: async ({ pageParam }) => {
-      const token = await getToken();
-
-      if (!token) {
-        throw new Error("No token");
-      }
-
-      return getMediaData({
-        token,
-        page: pageParam,
-        limit: pageSize,
-        type,
-        is_completed: isCompleted,
-        q: search || undefined,
-      });
-    },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      const totalPages = Math.ceil(lastPage.total / lastPage.limit);
-      return lastPage.page < totalPages ? lastPage.page + 1 : undefined;
-    },
-    staleTime: 1000 * 60 * 10,
-  });
+  const query = useInfiniteQuery(mediaListOptions(userId, getToken, { type, isCompleted, search, pageSize }));
 
   const items = query.data?.pages.flatMap((page) => page.data) ?? [];
   const total = query.data?.pages[0]?.total ?? 0;

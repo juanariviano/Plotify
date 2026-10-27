@@ -1,6 +1,6 @@
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { ImageUp, Link2, Minus, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -14,6 +14,8 @@ import TagInput from "../../components/ui/TagInput";
 import AnimatedNumber from "../../components/ui/AnimatedNumber";
 import { easeOut, fadeUp, stagger } from "../../lib/motion";
 import { btn, sourceLabel, unitOf } from "../../lib/ui";
+import { requireToken } from "../../lib/queries";
+import { addMedia, refreshMedia } from "../../lib/mediaCache";
 
 type ShelfType = "screen" | "read";
 
@@ -33,7 +35,7 @@ const Add = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const item: ShelfType = searchParams.get("item") === "read" ? "read" : "screen";
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(false);
@@ -46,7 +48,7 @@ const Add = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [errors, setErrors] = useState({ title: "", lastEpisode: "" });
-  const [matches, setMatches] = useState<ExternalMedia[]>([]);
+  const [lookupTitle, setLookupTitle] = useState("");
   const [linked, setLinked] = useState<ExternalMedia | null>(null);
 
   const unit = unitOf(item);
@@ -55,33 +57,22 @@ const Add = () => {
 
   // cari judul di tmdb / anilist / open library setelah user berhenti mengetik
   useEffect(() => {
-    const q = title.trim();
-    if (linked || q.length < 3) {
-      setMatches([]);
-      return;
-    }
+    const timer = setTimeout(() => setLookupTitle(title.trim()), 500);
+    return () => clearTimeout(timer);
+  }, [title]);
 
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const token = await getToken();
-        if (!token) return;
-        const results = await lookupMedia(token, q, item);
-        if (!cancelled) setMatches(results.slice(0, 6));
-      } catch (err) {
-        console.log(err);
-      }
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [title, item, linked, getToken]);
+  // hasil di-cache per judul, jadi judul yang sama tidak dicari ulang
+  const lookup = useQuery({
+    queryKey: ["lookup", item, lookupTitle],
+    queryFn: async ({ signal }) => lookupMedia(await requireToken(getToken), lookupTitle, item, signal),
+    enabled: !linked && lookupTitle.length >= 3,
+    staleTime: 1000 * 60 * 30,
+    placeholderData: keepPreviousData,
+  });
+  const matches = linked || title.trim().length < 3 ? [] : (lookup.data ?? []).slice(0, 6);
 
   const pickMatch = (m: ExternalMedia) => {
     setLinked(m);
-    setMatches([]);
     setTitle(m.title);
     if (!description.trim() && m.description) setDescription(m.description.slice(0, 500));
     if (category.length === 0 && m.category.length) setCategory(m.category.slice(0, 5).map((c) => c.toLowerCase()));
@@ -135,7 +126,7 @@ const Add = () => {
         imageUrl = await uploadThumbnail({ token, file: imageFile });
       }
 
-      await createMedia({
+      const [created] = await createMedia({
         token,
         mediaData: {
           title: title.trim(),
@@ -150,7 +141,8 @@ const Add = () => {
         },
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["media"] });
+      if (created) addMedia(queryClient, userId, created);
+      refreshMedia(queryClient, userId);
       navigate(`/${item}`);
     } catch (err) {
       console.log(err);

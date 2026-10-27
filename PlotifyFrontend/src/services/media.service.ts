@@ -7,6 +7,7 @@ import type {
   UncompleteMediaPayload,
   UpdateMediaPayload,
   Media,
+  MediaStats,
 } from "../types/media";
 import type { ExternalMedia } from "../types/chat";
 
@@ -17,6 +18,7 @@ type GetMediaParams = {
   type?: "screen" | "read";
   is_completed?: boolean;
   q?: string;
+  signal?: AbortSignal;
 };
 
 export const getMediaData = async ({
@@ -26,6 +28,7 @@ export const getMediaData = async ({
   type,
   is_completed,
   q,
+  signal,
 }: GetMediaParams): Promise<PaginatedMediaResponse> => {
   try {
     const params: Record<string, string | number | boolean> = { page, limit };
@@ -39,6 +42,7 @@ export const getMediaData = async ({
         Authorization: `Bearer ${token}`,
       },
       params,
+      signal,
     });
 
     return res.data;
@@ -48,7 +52,18 @@ export const getMediaData = async ({
   }
 };
 
-export const getMediaById = async (token: string, id: number): Promise<Media> => {
+export const getMediaStats = async (token: string, signal?: AbortSignal): Promise<MediaStats> => {
+  const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/media/stats`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+
+  return res.data;
+};
+
+export const getMediaById = async (token: string, id: number, signal?: AbortSignal): Promise<Media> => {
   try {
     const res = await axios.get(
       `${import.meta.env.VITE_BACKEND_URL}/media/${id}`,
@@ -56,6 +71,7 @@ export const getMediaById = async (token: string, id: number): Promise<Media> =>
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       },
     );
 
@@ -95,18 +111,21 @@ export const lookupMedia = async (
   token: string,
   q: string,
   type: "screen" | "read",
+  signal?: AbortSignal,
 ): Promise<ExternalMedia[]> => {
   const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/media/lookup`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
     params: { q, type },
+    signal,
   });
 
   return res.data;
 };
 
-export const createMedia = async ({ token, mediaData }: AddMediaPayload) => {
+// endpoint mutasi membalas array berisi baris yang berubah
+export const createMedia = async ({ token, mediaData }: AddMediaPayload): Promise<Media[]> => {
   const res = await axios.post(
     `${import.meta.env.VITE_BACKEND_URL}/media/add`,
     mediaData,
@@ -163,22 +182,6 @@ export const uncompleteMedia = async ({
   const res = await axios.put(
     `${import.meta.env.VITE_BACKEND_URL}/media/uncompleted/${id}`,
     {},
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  return res.data;
-};
-
-export const deleteMediaThumbnail = async ({
-  token,
-  id,
-}: DeleteMediaPayload) => {
-  const res = await axios.delete(
-    `${import.meta.env.VITE_BACKEND_URL}/media/deletethumbnail/${id}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

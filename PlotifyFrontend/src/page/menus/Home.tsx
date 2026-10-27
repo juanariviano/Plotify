@@ -10,6 +10,7 @@ import { StarDisplay } from "../../components/ui/Stars";
 import { Reveal } from "../../components/motion";
 import { easeOut, fadeUp, stagger } from "../../lib/motion";
 import { btn } from "../../lib/ui";
+import { usePrefetch } from "../../hooks/usePrefetch";
 
 const DEMO = [
   { id: "a", title: "severance", unit: "episode", total: 10, by: 1, step: "+1", tone: "#2f3b3a", start: 7 },
@@ -257,6 +258,7 @@ const Manifesto = () => {
 
 const Home = () => {
   const { isSignedIn } = useAuth();
+  const prefetch = usePrefetch();
   const primary = isSignedIn ? { to: "/screen", label: "go to your shelf" } : { to: "/signup", label: "start your shelf" };
   const secondary = isSignedIn ? { to: "/read", label: "open read" } : { to: "/signin", label: "i already have one" };
 
@@ -314,7 +316,7 @@ const Home = () => {
                 and pick up exactly where you stopped.
               </motion.p>
               <motion.div variants={fadeUp} className="mb-5 flex flex-wrap gap-3">
-                <Link to={primary.to} className={btn("primary", "lg", "group")}>
+                <Link to={primary.to} className={btn("primary", "lg", "group")} {...prefetch(primary.to)}>
                   {primary.label}
                   <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -439,11 +441,11 @@ const Home = () => {
               add what you're watching tonight. it takes less than a minute.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
-              <Link to={primary.to} className={btn("primary", "lg", "group")}>
+              <Link to={primary.to} className={btn("primary", "lg", "group")} {...prefetch(primary.to)}>
                 {primary.label}
                 <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
               </Link>
-              <Link to={secondary.to} className={btn("secondary", "lg")}>
+              <Link to={secondary.to} className={btn("secondary", "lg")} {...prefetch(secondary.to)}>
                 {secondary.label}
               </Link>
             </div>
