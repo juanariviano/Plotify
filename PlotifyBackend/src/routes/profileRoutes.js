@@ -4,6 +4,7 @@ import { clerkClient } from "@clerk/express";
 import { getAuth } from "@clerk/express";
 
 import { handleUpload } from "../middleware/upload.js";
+import { forgetUserId } from "../middleware/attachUserId.js";
 import { uploadImage, removeImage } from "../utils/storageHelper.js";
 import { validateName } from "../utils/validate.js";
 
@@ -156,6 +157,8 @@ router.delete("/delete", async (req, res) => {
       .eq("id", req.userId);
 
     if (error) throw error;
+
+    forgetUserId(clerkId);
 
     res.json({ message: "Account deleted successfully" });
   } catch (err) {

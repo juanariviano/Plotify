@@ -1,8 +1,9 @@
 import axios from "axios";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { getUserData } from "../services/profile.service";
+import { clearCache } from "../lib/queryClient";
 
 const isMissingProfile = (error: unknown) =>
   axios.isAxiosError(error) && error.response?.status === 404;
@@ -17,7 +18,6 @@ export const useProfile = () => {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { getToken } = useAuth();
-  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["profile", user?.id],
@@ -35,11 +35,11 @@ export const useProfile = () => {
   useEffect(() => {
     if (!missing || signingOut) return;
     signingOut = true;
-    queryClient.clear();
+    clearCache();
     signOut({ redirectUrl: "/signin" }).finally(() => {
       signingOut = false;
     });
-  }, [missing, queryClient, signOut]);
+  }, [missing, signOut]);
 
   return { ...query, user, isLoaded, missing };
 };

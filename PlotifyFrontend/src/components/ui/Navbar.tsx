@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Menu, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useProfile } from "../../hooks/useProfile";
+import { usePrefetch } from "../../hooks/usePrefetch";
 import { btn } from "../../lib/ui";
 import { easeOut } from "../../lib/motion";
 import Ribbon from "./Ribbon";
@@ -27,6 +28,7 @@ const APP_LINKS = [
 
 const Avatar = () => {
   const { data: profile } = useProfile();
+  const prefetch = usePrefetch();
 
   const initial = (profile?.fullname || profile?.username || "·").charAt(0).toLowerCase();
 
@@ -34,6 +36,7 @@ const Avatar = () => {
     <NavLink
       to="/profile"
       aria-label="your profile"
+      {...prefetch("/profile")}
       className={({ isActive }) =>
         `flex h-10 w-10 items-center justify-center overflow-hidden bg-[#3b4a3f] font-serif text-lg text-white transition-[outline-color] ${
           isActive ? "outline-2 outline-offset-2 outline-accent" : "outline-2 outline-offset-2 outline-transparent hover:outline-line-strong"
@@ -53,6 +56,7 @@ const Navbar = () => {
   const { isSignedIn } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const prefetch = usePrefetch();
   const shelf = location.pathname.startsWith("/read") ? "read" : "screen";
 
   return (
@@ -63,7 +67,7 @@ const Navbar = () => {
         {isSignedIn && (
           <nav aria-label="shelves" className="hidden items-center gap-6 text-sm sm:flex">
             {APP_LINKS.map((link) => (
-              <NavLink key={link.to} to={link.to} className="relative py-1.5">
+              <NavLink key={link.to} to={link.to} className="relative py-1.5" {...prefetch(link.to)}>
                 {({ isActive }) => (
                   <>
                     <span className={isActive ? "text-ink" : "text-muted transition-colors hover:text-ink"}>
@@ -154,6 +158,7 @@ const Navbar = () => {
                 >
                   <NavLink
                     to={link.to}
+                    {...prefetch(link.to)}
                     onClick={() => setOpen(false)}
                     className={({ isActive }) =>
                       `flex h-12 items-center border-b border-line font-serif text-2xl last:border-0 ${

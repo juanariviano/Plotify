@@ -4,15 +4,15 @@ import { BrowserRouter } from "react-router";
 import { ClerkProvider } from "@clerk/clerk-react";
 import "./index.css";
 import App from "./App.tsx";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { MotionConfig } from "motion/react";
+import { persistOptions, queryClient } from "./lib/queryClient.ts";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <BrowserRouter>
         <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
           <MotionConfig reducedMotion="user">
@@ -20,6 +20,6 @@ createRoot(document.getElementById("root")!).render(
           </MotionConfig>
         </ClerkProvider>
       </BrowserRouter>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </StrictMode>,
 );

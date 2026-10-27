@@ -3,18 +3,19 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, Check, ImageUp, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Media } from "../../types/media";
 import {
   completeMedia,
   deleteMedia,
-  deleteMediaThumbnail,
-  getMediaById,
   uncompleteMedia,
   updateMedia,
   uploadThumbnail,
 } from "../../services/media.service";
 import { useLogProgress } from "../../hooks/useLogProgress";
+import { useMediaItem } from "../../hooks/useMediaItem";
+import { patchMedia, refreshMedia, removeMedia } from "../../lib/mediaCache";
+import { mediaKeys } from "../../lib/queries";
 import LoadingScreen from "../../components/ui/LoadingScreen";
 import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
@@ -46,14 +47,14 @@ const formatAdded = (value: Date | string) => {
 
 const Card = () => {
   const [searchParams] = useSearchParams();
-  const id = searchParams.get("id");
+  const id = parseInt(searchParams.get("id") ?? "", 10);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const log = useLogProgress();
 
-  const [item, setItem] = useState<Media | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: item, isLoading: loading } = useMediaItem(id);
+  const deleted = useRef(false);
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState<1 | -1>(1);
 
@@ -70,24 +71,10 @@ const Card = () => {
   const [ratingError, setRatingError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    const loadMedia = async () => {
-      try {
-        setLoading(true);
-        const token = await getToken();
-        if (!token || !id) return;
-
-        const data = await getMediaById(token, parseInt(id, 10));
-        setItem(data);
-      } catch (err) {
-        console.log(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMedia();
-  }, [getToken, id]);
+  // forget a deleted item only once we've left, so it isn't refetched while still on screen
+  useEffect(() => () => {
+    if (deleted.current) queryClient.removeQueries({ queryKey: mediaKeys.item(userId, id), exact: true });
+  }, [queryClient, userId, id]);
 
   useEffect(() => {
     if (item) document.title = `${item.title} · plotify`;
@@ -97,10 +84,6 @@ const Card = () => {
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
-
-  const refreshShelves = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["media"] });
-  };
 
   const startEdit = () => {
     if (!item) return;
@@ -152,11 +135,8 @@ const Card = () => {
       const token = await getToken();
       if (!token) return;
 
+      // the backend removes the old cover from storage when image_url changes
       let imageUrl = item.image_url;
-
-      if (deleteThumbnail || imageFile) {
-        await deleteMediaThumbnail({ token, id: item.id });
-      }
 
       if (imageFile) {
         imageUrl = await uploadThumbnail({ token, file: imageFile });
@@ -175,8 +155,8 @@ const Card = () => {
       };
 
       await updateMedia({ token, id: item.id, mediaData });
-      setItem({ ...item, ...mediaData, rating: item.is_completed ? form.rating : item.rating });
-      await refreshShelves();
+      patchMedia(queryClient, userId, item.id, mediaData);
+      refreshMedia(queryClient, userId);
       cancelEdit();
     } catch (err) {
       console.log(err);
@@ -190,11 +170,7 @@ const Card = () => {
     const next = Math.max(0, item.last_episode + delta);
     if (next === item.last_episode) return;
     setDirection(delta);
-    setItem({ ...item, last_episode: next });
-    log.mutate(
-      { item, next },
-      { onError: () => setItem((current) => (current ? { ...current, last_episode: item.last_episode } : current)) },
-    );
+    log.mutate({ item, next });
   };
 
   const handleDelete = async () => {
@@ -204,11 +180,13 @@ const Card = () => {
       const token = await getToken();
       if (!token) return;
 
-      await deleteMediaThumbnail({ token, id: item.id });
+      // the backend also removes the cover from storage
       await deleteMedia({ token, id: item.id });
-      await refreshShelves();
+      deleted.current = true;
 
       navigate(item.type === "read" ? "/read" : "/screen");
+      removeMedia(queryClient, userId, item.id);
+      refreshMedia(queryClient, userId);
     } catch (error) {
       console.log(error);
       setBusy(false);
@@ -228,8 +206,8 @@ const Card = () => {
       if (!token) return;
 
       await completeMedia({ token, id: item.id, rating });
-      setItem({ ...item, is_completed: true, rating });
-      await refreshShelves();
+      patchMedia(queryClient, userId, item.id, { is_completed: true, rating });
+      refreshMedia(queryClient, userId);
       setShowComplete(false);
     } catch (err) {
       console.log(err);
@@ -246,8 +224,8 @@ const Card = () => {
       if (!token) return;
 
       await uncompleteMedia({ token, id: item.id });
-      setItem({ ...item, is_completed: false });
-      await refreshShelves();
+      patchMedia(queryClient, userId, item.id, { is_completed: false });
+      refreshMedia(queryClient, userId);
       setShowUncomplete(false);
     } catch (err) {
       console.log(err);

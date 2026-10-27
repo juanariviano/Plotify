@@ -11,19 +11,15 @@ import LoadingScreen from "../../components/ui/LoadingScreen";
 import { StarDisplay } from "../../components/ui/Stars";
 import { Reveal } from "../../components/motion";
 import { easeOut, fadeUp, stagger } from "../../lib/motion";
-import { useMediaSlice } from "../../hooks/useMediaSummary";
+import { useMediaStats } from "../../hooks/useMediaStats";
 import { useProfile } from "../../hooks/useProfile";
 import { btn, unitOf } from "../../lib/ui";
-import type { Media } from "../../types/media";
 
 const Profile = () => {
   const { signOut } = useClerk();
   const { data: profile, isLoading: profileLoading, missing, user, isLoaded } = useProfile();
 
-  const screenOngoing = useMediaSlice("screen", false, 6);
-  const readOngoing = useMediaSlice("read", false, 6);
-  const screenDone = useMediaSlice("screen", true, 50);
-  const readDone = useMediaSlice("read", true, 50);
+  const { data: stats } = useMediaStats();
 
   const loading = !isLoaded || profileLoading || missing;
   const hasPassword = user?.passwordEnabled;
@@ -44,33 +40,21 @@ const Profile = () => {
     return <LoadingScreen canExit={true} onFinish={() => {}} />;
   }
 
-  const ongoing: Media[] = [...(screenOngoing.data?.data ?? []), ...(readOngoing.data?.data ?? [])]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 4);
-  const finished: Media[] = [...(screenDone.data?.data ?? []), ...(readDone.data?.data ?? [])];
-  const favourites = [...finished].sort((a, b) => b.rating - a.rating).slice(0, 3);
+  const ongoing = stats?.ongoing ?? [];
+  const favourites = stats?.favourites ?? [];
+  const finishedCount = stats?.totals.finished ?? 0;
 
   const totals = [
-    { label: "on your shelves now", value: (screenOngoing.data?.total ?? 0) + (readOngoing.data?.total ?? 0) },
-    { label: "finished", value: (screenDone.data?.total ?? 0) + (readDone.data?.total ?? 0) },
-    { label: "shows finished", value: screenDone.data?.total ?? 0 },
-    { label: "reads finished", value: readDone.data?.total ?? 0 },
+    { label: "on your shelves now", value: stats?.totals.ongoing ?? 0 },
+    { label: "finished", value: finishedCount },
+    { label: "shows finished", value: stats?.totals.screenFinished ?? 0 },
+    { label: "reads finished", value: stats?.totals.readFinished ?? 0 },
   ];
 
-  const categoryCounts = Object.entries(
-    [...finished, ...ongoing].flatMap((m) => m.category ?? []).reduce<Record<string, number>>((acc, c) => {
-      acc[c] = (acc[c] ?? 0) + 1;
-      return acc;
-    }, {}),
-  )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  const categoryCounts = stats?.categories ?? [];
   const topCategory = categoryCounts[0]?.[1] ?? 1;
 
-  const ratingBuckets = [5, 4, 3, 2, 1].map((stars) => ({
-    stars,
-    count: finished.filter((m) => Math.round(m.rating) === stars).length,
-  }));
+  const ratingBuckets = stats?.ratings ?? [];
   const topBucket = Math.max(1, ...ratingBuckets.map((b) => b.count));
 
   const since = user?.createdAt
@@ -192,7 +176,7 @@ const Profile = () => {
 
           <Reveal className="min-w-0 flex-[1_1_300px]" delay={0.1}>
             <h2 className="mb-2 border-b border-ink pb-2.5 font-serif text-[26px]">how you rate</h2>
-            {finished.length ? (
+            {finishedCount ? (
               <ul className="mt-3">
                 {ratingBuckets.map((b, i) => (
                   <li key={b.stars} className="flex items-center gap-3 py-2">

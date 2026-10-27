@@ -86,12 +86,33 @@ async function searchOpenLibrary(q) {
   }));
 }
 
+// hasil lookup jarang berubah; judul yang sama tidak perlu memanggil API luar lagi
+const LOOKUP_TTL = 60 * 60 * 1000;
+const LOOKUP_MAX = 500;
+const lookupCache = new Map();
+
+export async function lookupExternal(q, type) {
+  const key = `${type}:${q.trim().toLowerCase()}`;
+  const hit = lookupCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.results;
+
+  const results = await searchExternal(q, type);
+
+  // hasil kosong tidak disimpan, bisa jadi karena API luar sedang gagal
+  if (results.length) {
+    if (lookupCache.size >= LOOKUP_MAX) lookupCache.delete(lookupCache.keys().next().value);
+    lookupCache.set(key, { results, expires: Date.now() + LOOKUP_TTL });
+  }
+
+  return results;
+}
+
 /**
  * cari di semua sumber sesuai tipe rak
  * screen → TMDB + AniList anime
  * read   → AniList manga + Open Library
  */
-export async function lookupExternal(q, type) {
+async function searchExternal(q, type) {
   const searches =
     type === "screen"
       ? [searchTmdb(q), searchAnilist(q, "ANIME")]

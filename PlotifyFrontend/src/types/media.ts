@@ -18,6 +18,14 @@ export type ItemsProps = {
   search?: string;
 };
 
+export type MediaStats = {
+  totals: { ongoing: number; finished: number; screenFinished: number; readFinished: number };
+  ongoing: Media[];
+  favourites: Media[];
+  ratings: { stars: number; count: number }[];
+  categories: [string, number][];
+};
+
 export type PaginatedMediaResponse = {
   data: Media[];
   total: number;
