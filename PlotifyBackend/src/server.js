@@ -25,7 +25,8 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`origin ${origin} not allowed by cors`));
+      // tanpa header CORS, browser yang memblokir. tidak perlu dilempar jadi error 500
+      return callback(null, false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
