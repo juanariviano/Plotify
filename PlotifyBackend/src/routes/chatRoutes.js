@@ -6,6 +6,9 @@ const router = express.Router();
 const MAX_MESSAGES = 20;
 const MAX_TEXT = 2000;
 
+// env yang wajib ada supaya chatbot bisa jalan (gemini + tmdb)
+const REQUIRED_ENV = ["GEMINI_API_KEY", "GEMINI_CHAT_MODEL", "TMDB_ACCESS_TOKEN"];
+
 /**
  * kirim pesan ke chatbot
  * body: { messages: [{ role: "user" | "model", text }] }
@@ -27,6 +30,12 @@ router.post("/", async (req, res) => {
 
   if (!valid) {
     return res.status(400).json({ message: "format messages tidak valid" });
+  }
+
+  const missingEnv = REQUIRED_ENV.filter((name) => !process.env[name]);
+  if (missingEnv.length) {
+    console.error(`chatbot: env belum diset: ${missingEnv.join(", ")}`);
+    return res.status(500).json({ message: "chatbot belum dikonfigurasi" });
   }
 
   try {
