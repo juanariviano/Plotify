@@ -145,8 +145,6 @@ const EditProfile = () => {
       await editProfileData({
         fullname,
         username,
-        email,
-        clerkId: user?.id,
         token,
       });
 
@@ -188,13 +186,9 @@ const EditProfile = () => {
       const token = await getToken();
 
       await user?.reload();
-      const latestEmail = user?.primaryEmailAddress?.emailAddress;
-
       await editProfileData({
         fullname,
         username,
-        email: latestEmail!,
-        clerkId: user?.id,
         token,
       });
 

@@ -2,9 +2,10 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { ImageUp, Minus, Plus, X } from "lucide-react";
+import { ImageUp, Link2, Minus, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createMedia, uploadThumbnail } from "../../services/media.service";
+import { createMedia, lookupMedia, uploadThumbnail } from "../../services/media.service";
+import type { ExternalMedia } from "../../types/chat";
 import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
@@ -19,6 +20,13 @@ type ShelfType = "screen" | "read";
 const SOURCE_CHIPS: Record<ShelfType, string[]> = {
   screen: ["netflix", "crunchyroll", "prime video", "disney+", "youtube"],
   read: ["kindle", "mangadex", "webtoon", "paperback", "library"],
+};
+
+const SOURCE_NAMES: Record<ExternalMedia["external_source"], string> = {
+  tmdb_movie: "tmdb · movie",
+  tmdb_tv: "tmdb · series",
+  anilist: "anilist",
+  openlibrary: "open library",
 };
 
 const Add = () => {
@@ -38,9 +46,47 @@ const Add = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [errors, setErrors] = useState({ title: "", lastEpisode: "" });
+  const [matches, setMatches] = useState<ExternalMedia[]>([]);
+  const [linked, setLinked] = useState<ExternalMedia | null>(null);
 
   const unit = unitOf(item);
   const preview = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
+  const coverSrc = preview || linked?.image_url || null;
+
+  // cari judul di tmdb / anilist / open library setelah user berhenti mengetik
+  useEffect(() => {
+    const q = title.trim();
+    if (linked || q.length < 3) {
+      setMatches([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const results = await lookupMedia(token, q, item);
+        if (!cancelled) setMatches(results.slice(0, 6));
+      } catch (err) {
+        console.log(err);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [title, item, linked, getToken]);
+
+  const pickMatch = (m: ExternalMedia) => {
+    setLinked(m);
+    setMatches([]);
+    setTitle(m.title);
+    if (!description.trim() && m.description) setDescription(m.description.slice(0, 500));
+    if (category.length === 0 && m.category.length) setCategory(m.category.slice(0, 5).map((c) => c.toLowerCase()));
+    if (errors.title) setErrors((er) => ({ ...er, title: "" }));
+  };
 
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -50,7 +96,10 @@ const Add = () => {
     document.title = `add to ${item} · plotify`;
   }, [item]);
 
-  const setShelf = (next: ShelfType) => setSearchParams({ item: next }, { replace: true });
+  const setShelf = (next: ShelfType) => {
+    setLinked(null);
+    setSearchParams({ item: next }, { replace: true });
+  };
 
   const bump = (delta: 1 | -1) => {
     const current = Number(lastEpisode) || 0;
@@ -81,7 +130,7 @@ const Add = () => {
       const token = await getToken();
       if (!token) return;
 
-      let imageUrl = null;
+      let imageUrl = linked?.image_url ?? null;
       if (imageFile) {
         imageUrl = await uploadThumbnail({ token, file: imageFile });
       }
@@ -96,6 +145,8 @@ const Add = () => {
           last_episode: Number(lastEpisode),
           type: item,
           image_url: imageUrl,
+          external_source: linked?.external_source ?? null,
+          external_id: linked?.external_id ?? null,
         },
       });
 
@@ -152,6 +203,56 @@ const Add = () => {
                 }}
               />
               {errors.title && <p className="mt-1.5 text-sm text-danger">{errors.title}</p>}
+
+              {linked && (
+                <div className="mt-2.5 inline-flex items-center gap-2 border border-line bg-white px-3 py-1.5 text-[13px] text-body">
+                  <Link2 size={14} />
+                  linked to {SOURCE_NAMES[linked.external_source]}
+                  {linked.year && <span className="text-muted">· {linked.year}</span>}
+                  <button
+                    type="button"
+                    aria-label="unlink"
+                    className="ml-1 text-muted hover:text-ink"
+                    onClick={() => setLinked(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              <AnimatePresence>
+                {matches.length > 0 && (
+                  <motion.ul
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="mt-2 flex flex-col border border-line bg-white"
+                    aria-label="matching titles"
+                  >
+                    <li className="border-b border-line px-4 py-2 font-mono text-[11px] text-muted">
+                      is it one of these? pick to fill in the details
+                    </li>
+                    {matches.map((m) => (
+                      <li key={`${m.external_source}:${m.external_id}`}>
+                        <button
+                          type="button"
+                          onClick={() => pickMatch(m)}
+                          className="flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-soft"
+                        >
+                          <Cover title={m.title} src={m.image_url} className="aspect-[3/4] w-9 shrink-0" titleClassName="text-[8px]" showTitle={false} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-ink normal-case">{m.title}</span>
+                            <span className="font-mono text-[11px] text-muted">
+                              {SOURCE_NAMES[m.external_source]}
+                              {m.year && ` · ${m.year}`}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
             </motion.div>
 
             <motion.fieldset variants={fadeUp}>
@@ -335,7 +436,7 @@ const Add = () => {
             <div className="flex flex-col gap-5 border border-line bg-soft p-6">
               <div className="flex justify-center">
                 <motion.div
-                  key={preview || "tone"}
+                  key={coverSrc || "tone"}
                   initial={{ rotateY: -12, opacity: 0.4 }}
                   animate={{ rotateY: 0, opacity: 1 }}
                   transition={{ duration: 0.6, ease: easeOut }}
@@ -344,7 +445,7 @@ const Add = () => {
                 >
                   <Cover
                     title={shownTitle}
-                    src={preview || null}
+                    src={coverSrc}
                     className="aspect-[3/4] w-full shadow-[0_24px_50px_-24px_rgb(23_22_15/0.5)]"
                     titleClassName="text-2xl"
                   />

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useClerk, useUser } from "@clerk/clerk-react";
+import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { getUserData } from "../services/profile.service";
@@ -16,13 +16,14 @@ let signingOut = false;
 export const useProfile = () => {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error("No user id");
-      return getUserData(user.id);
+      return getUserData(await getToken());
     },
     enabled: !!isLoaded && !!user?.id,
     staleTime: 1000 * 60 * 10,

@@ -35,6 +35,8 @@ export type AddMediaPayload = {
     source: string;
     last_episode: number;
     type: string;
+    external_source?: string | null;
+    external_id?: string | null;
   }
 }
 

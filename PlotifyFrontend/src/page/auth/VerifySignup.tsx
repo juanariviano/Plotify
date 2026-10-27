@@ -11,7 +11,7 @@ const VerifySignup = () => {
   const navigate = useNavigate();
   const { setActive } = useSignUp();
   const { isLoaded, user } = useUser();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
 
   const [fullname, setFullname] = useState("");
   const [username, setUsername] = useState("");
@@ -29,7 +29,7 @@ const VerifySignup = () => {
 
     const checkUser = async () => {
       try {
-        const res = await getUserData(user.id);
+        const res = await getUserData(await getToken());
 
         if (res.fullname && res.username) {
           navigate("/", { replace: true });
@@ -79,10 +79,11 @@ const VerifySignup = () => {
         await setActive({ session: sessionId });
       }
 
+      // token diambil setelah setActive supaya milik user yang baru signup
       await completeProfile({
         fullname,
         username,
-        clerkId: finalClerkId,
+        token: await getToken(),
       });
 
       sessionStorage.removeItem("signup_session_id");

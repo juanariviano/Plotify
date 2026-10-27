@@ -6,9 +6,11 @@ import webhookRoutes from "./routes/webhookRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 import attachUserId from "./middleware/attachUserId.js";
 
 const app = express();
+app.disable("x-powered-by");
 const PORT = process.env.PORT || 8080;
 
 const allowedOrigins = [
@@ -35,7 +37,7 @@ app.use(clerkMiddleware());
 
 // Clerk webhooks need the raw body buffer for signature verification
 app.use("/webhooks", express.raw({ type: "application/json" }));
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 
 app.get("/", (_req, res) => {
   res.status(200).json({ ok: true, service: "plotify-backend" });
@@ -43,9 +45,10 @@ app.get("/", (_req, res) => {
 
 // flow: clerk -> webhook -> backend -> supabase
 app.use("/webhooks", webhookRoutes);
-app.use("/auth", authRoutes);
+app.use("/auth", authMiddleware, authRoutes);
 app.use("/media", authMiddleware, attachUserId, mediaRoutes);
 app.use("/profile", authMiddleware, attachUserId, profileRoutes);
+app.use("/chat", authMiddleware, attachUserId, chatRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
