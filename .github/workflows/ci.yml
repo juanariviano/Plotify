@@ -1,0 +1,62 @@
+# test, build dan audit dependency di setiap push / pull request
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PlotifyBackend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: PlotifyBackend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # gagal kalau ada celah high / critical di dependency yang ikut ke production
+      - run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PlotifyFrontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: PlotifyFrontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PlotifyExtension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: PlotifyExtension/package-lock.json
+      - run: npm ci
+      # build butuh key clerk di .env, jadi di CI cukup typecheck
+      - run: npx tsc -b
+      - run: npm audit --audit-level=high
