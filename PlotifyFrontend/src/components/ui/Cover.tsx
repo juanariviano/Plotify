@@ -23,9 +23,11 @@ const Cover = ({ title, src, className = "", titleClassName = "text-lg", showTit
     );
   }
 
+  // percentage padding is measured against the parent's width, not the cover's own, so it only goes on
+  // when there's a title to inset. a small cover in a wide list row would otherwise grow to fit the padding
   return (
     <div
-      className={`flex items-end overflow-hidden p-[8%] ${className}`}
+      className={`flex items-end overflow-hidden ${showTitle ? "p-[8%]" : ""} ${className}`}
       style={{ background: coverTone(title) }}
       role="img"
       aria-label={title}

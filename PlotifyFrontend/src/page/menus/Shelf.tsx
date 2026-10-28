@@ -195,7 +195,9 @@ const ListRow = ({ item, completed }: { item: Media; completed: boolean }) => (
     <div className="ml-auto flex shrink-0 items-center gap-3 sm:ml-0">
       {completed ? (
         <span className="flex items-center gap-2 bg-done-soft px-2.5 py-1 font-mono text-xs text-done">
-          <StarDisplay rating={item.rating} size={12} /> {item.rating}
+          <StarDisplay rating={item.rating} size={12} />
+          {/* fixed width so "4" and "4.5" make the same pill, and the stars line up row to row */}
+          <span className="w-[3ch] text-right">{item.rating}</span>
         </span>
       ) : (
         <QuickLog item={item} />
