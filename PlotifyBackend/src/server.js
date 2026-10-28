@@ -17,6 +17,8 @@ const allowedOrigins = [
   "https://yourplotify.site",
   "https://www.yourplotify.site",
   "http://localhost:5173",
+  // origin extension chrome, contoh: chrome-extension://<id>. pisahkan dengan koma kalau lebih dari satu
+  ...(process.env.EXTENSION_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
 ];
 
 app.use(

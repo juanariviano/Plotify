@@ -33,7 +33,7 @@ router.post(
 // fetch data
 /**
  * balikin data media berdasarkan user id dengan pagination
- * query: page, limit, type, is_completed, q
+ * query: page, limit, type, is_completed, q, site (hostname di kolom source, dipakai extension)
  */
 router.get("/", async (req, res) => {
   try {
@@ -43,13 +43,17 @@ router.get("/", async (req, res) => {
       Math.max(1, parseInt(req.query.limit, 10) || 20),
     );
     const offset = (page - 1) * limit;
-    const { q, type, is_completed } = req.query;
+    const { q, type, is_completed, site } = req.query;
 
     if (type !== undefined && !MEDIA_TYPES.includes(type)) {
       return res.status(400).json({ message: "type harus screen atau read" });
     }
     if (q !== undefined && (typeof q !== "string" || q.length > 200)) {
       return res.status(400).json({ message: "q tidak valid" });
+    }
+    // hanya huruf, angka, titik dan strip supaya tidak bisa menyisipkan wildcard ilike
+    if (site !== undefined && (typeof site !== "string" || !/^[a-z0-9.-]{1,253}$/i.test(site))) {
+      return res.status(400).json({ message: "site tidak valid" });
     }
 
     let query = supabase
@@ -67,6 +71,10 @@ router.get("/", async (req, res) => {
 
     if (q) {
       query = query.ilike("title", `%${q}%`);
+    }
+
+    if (site) {
+      query = query.ilike("source", `%${site}%`);
     }
 
     const { data, error, count } = await query
