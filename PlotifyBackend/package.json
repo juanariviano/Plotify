@@ -16,10 +16,10 @@
   "dependencies": {
     "@clerk/express": "^2.0.4",
     "@google/genai": "^2.31.0",
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.118.0",
     "cors": "^2.8.6",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "multer": "^2.1.1",
-    "svix": "^1.96.0"
+    "svix": "^1.99.1"
   }
 }
