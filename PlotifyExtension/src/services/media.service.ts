@@ -63,3 +63,21 @@ export const completeMedia = async (token: string, id: number, rating: number) =
 
 export const uncompleteMedia = async (token: string, id: number) =>
   (await request<Media[]>(token, `/media/uncompleted/${id}`, { method: "PUT", body: "{}" }))[0];
+
+// season yang selesai wajib punya rating (dari body atau yang sudah tersimpan)
+export const updateSeason = async (
+  token: string,
+  id: number,
+  season: number,
+  fields: { last_episode?: number; is_completed?: boolean; rating?: number },
+) =>
+  (await request<Media[]>(token, `/media/${id}/seasons/${season}`, { method: "PUT", body: JSON.stringify(fields) }))[0];
+
+// season aktif ditandai selesai; restart true = season berikutnya mulai dari 0
+export const nextSeason = async (token: string, id: number, restart: boolean, rating?: number) =>
+  (
+    await request<Media[]>(token, `/media/${id}/seasons/next`, {
+      method: "POST",
+      body: JSON.stringify({ restart, ...(rating ? { rating } : {}) }),
+    })
+  )[0];

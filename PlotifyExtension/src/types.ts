@@ -1,5 +1,14 @@
 export type MediaType = "screen" | "read";
 
+// satu season (screen) / volume (read); media.season + last_episode adalah season yang aktif
+export type Season = {
+  season: number;
+  last_episode: number;
+  is_completed: boolean;
+  rating: number | null;
+  rewatch_count: number;
+};
+
 export type Media = {
   id: number;
   image_url: string | null;
@@ -9,7 +18,11 @@ export type Media = {
   source: string;
   type: MediaType;
   last_episode: number;
+  season: number;
+  rewatch_count: number;
+  seasons?: Season[];
   is_completed: boolean;
+  // rata-rata rating season
   rating: number;
   user_id: number;
   created_at: string;
@@ -41,6 +54,7 @@ export type NewMedia = {
   category: string[];
   source: string;
   last_episode: number;
+  season: number;
   type: MediaType;
   external_source: string | null;
   external_id: string | null;

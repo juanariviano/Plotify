@@ -46,7 +46,9 @@ export const coverTone = (title: string) => {
 };
 
 export const unitOf = (type: MediaType) =>
-  type === "read" ? { long: "page", short: "p", plural: "pages" } : { long: "episode", short: "ep", plural: "episodes" };
+  type === "read"
+    ? { long: "page", short: "p", plural: "pages", part: "volume", again: "reread" }
+    : { long: "episode", short: "ep", plural: "episodes", part: "season", again: "rewatch" };
 
 export const isUrl = (value: string | null | undefined) =>
   !!value && /^https?:\/\//i.test(value.trim());

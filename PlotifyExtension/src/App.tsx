@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/chrome-extension";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeftRight, ArrowUpRight } from "lucide-react";
 import AddForm from "./components/AddForm";
 import ListPicker from "./components/ListPicker";
 import Message from "./components/Message";
 import Tracker from "./components/Tracker";
-import { ApiError, findMedia } from "./services/media.service";
+import { ApiError, findMedia, lookupMedia } from "./services/media.service";
 import { loadPage } from "./lib/page";
-import { detectEpisode, guessType, pageHost, rankMatches, titleOptions } from "./lib/match";
+import { detectEpisode, guessType, normalize, pageHost, rankMatches, titleOptions } from "./lib/match";
 import { useToken } from "./lib/useToken";
 import { btn, openTab, PLOTIFY_URL } from "./lib/ui";
 import { page as pageMotion } from "./lib/motion";
@@ -35,6 +35,7 @@ type View = { kind: "auto" } | { kind: "pick" } | { kind: "add" } | { kind: "tra
 
 function Popup() {
   const getToken = useToken();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState<PageInfo | null | undefined>(undefined);
   // auto = pakai kecocokan terbaik dengan halaman ini (kalau tidak ada, form add)
   const [view, setView] = useState<View>({ kind: "auto" });
@@ -58,7 +59,26 @@ function Popup() {
         host ? findMedia(token, { site: host }, signal) : empty,
         options[0] ? findMedia(token, { q: options[0], limit: 10 }, signal) : empty,
       ]);
-      return rankMatches([...bySite.data, ...byTitle.data], page!, options);
+      const items = [...bySite.data, ...byTitle.data];
+      const ranked = rankMatches(items, page!, options);
+      if ((ranked[0]?.score ?? 0) >= 2 || !options[0]) return ranked;
+
+      // belum ketemu: judulnya mungkin diganti rekomendasi waktu ditambahkan. cari judul halaman di tmdb / anilist
+      // dengan key yang sama seperti form add, jadi kalau ujungnya tetap form add, hasilnya tidak diminta dua kali
+      const type = guessType(page!);
+      const external = await queryClient
+        .fetchQuery({
+          queryKey: ["lookup", options[0], type],
+          queryFn: ({ signal }) => lookupMedia(token, options[0], type, signal),
+          staleTime: 5 * 60 * 1000,
+        })
+        .catch(() => []);
+
+      // judul rekomendasi teratas bisa beda bahasa dengan judul halaman, jadi rak juga dicari dengan judul itu
+      const top = external[0]?.title;
+      const byExternal =
+        top && normalize(top) !== normalize(options[0]) ? await findMedia(token, { q: top, limit: 10 }, signal) : empty;
+      return rankMatches([...items, ...byExternal.data], page!, options, external);
     },
   });
 

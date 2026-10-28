@@ -45,6 +45,7 @@ const AddForm = ({ page, options, detected, initialType, similar, onPick, onBrow
   const [description, setDescription] = useState("");
   const [categories, setCategories] = useState("");
   const [episode, setEpisode] = useState(String(detected ?? 0));
+  const [season, setSeason] = useState("1");
   const [pick, setPick] = useState<ExternalMedia | null>(null);
   const canSaveSource = /^https?:/.test(page.url) && page.url.length <= 500;
   const [saveSource, setSaveSource] = useState(canSaveSource);
@@ -82,6 +83,10 @@ const AddForm = ({ page, options, detected, initialType, similar, onPick, onBrow
     const lastEpisode = Number(episode);
     if (!title.trim()) return setError("title is required");
     if (!Number.isInteger(lastEpisode) || lastEpisode < 0) return setError(`${unitOf(type).long} must be 0 or more`);
+    const seasonNumber = Number(season);
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 1 || seasonNumber > 1000) {
+      return setError(`${unitOf(type).part} must be 1 to 1000`);
+    }
 
     setSaving(true);
     setError("");
@@ -94,6 +99,7 @@ const AddForm = ({ page, options, detected, initialType, similar, onPick, onBrow
         category: parseCategories(categories),
         source: saveSource ? page.url : "",
         last_episode: lastEpisode,
+        season: seasonNumber,
         type,
         external_source: pick?.external_source ?? null,
         external_id: pick?.external_id ?? null,
@@ -243,7 +249,7 @@ const AddForm = ({ page, options, detected, initialType, similar, onPick, onBrow
           placeholder="optional"
         />
 
-        <div className="mt-4 grid grid-cols-[1fr_128px] gap-3">
+        <div className="mt-4 grid grid-cols-[1fr_72px_96px] gap-3">
           <div>
             <label className="label" htmlFor="categories">
               categories
@@ -255,6 +261,20 @@ const AddForm = ({ page, options, detected, initialType, similar, onPick, onBrow
               onChange={(e) => setCategories(e.target.value)}
               placeholder="action, fantasy"
               autoComplete="off"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="season">
+              {unitOf(type).part}
+            </label>
+            <input
+              id="season"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              className="field text-center font-mono"
+              value={season}
+              onChange={(e) => setSeason(e.target.value)}
             />
           </div>
           <div>

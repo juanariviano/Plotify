@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Minus, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Layers, Minus, Plus, Repeat, RotateCcw, Sparkles } from "lucide-react";
 import Cover from "./Cover";
 import StarPicker from "./StarPicker";
-import { completeMedia, uncompleteMedia, updateMedia } from "../services/media.service";
+import { nextSeason, uncompleteMedia, updateMedia, updateSeason } from "../services/media.service";
 import { useToken } from "../lib/useToken";
 import { btn, isUrl, unitOf } from "../lib/ui";
 import { collapse, ease, fade, pop } from "../lib/motion";
@@ -49,9 +49,16 @@ const Tracker = ({ item, page, detected, onChange }: Props) => {
   const [draft, setDraft] = useState(String(item.last_episode));
   const [status, setStatus] = useState<Status>("idle");
   const [rating, setRating] = useState(0);
-  const [completing, setCompleting] = useState(false);
+  // panel di bawah: rating untuk menyelesaikan season aktif, atau pindah ke season berikutnya
+  const [panel, setPanel] = useState<"finish" | "next" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const seasons = item.seasons ?? [];
+  const active = seasons.find((s) => s.season === item.season);
+  const othersRunning = seasons.some((s) => !s.is_completed && s.season !== item.season);
+  const nextExisting = seasons.find((s) => s.season === item.season + 1);
+  const multi = seasons.length > 1 || item.season > 1;
 
   // klik +/- beruntun: satu request jalan sekaligus, nilai terakhir yang pasti tersimpan
   const desired = useRef(item.last_episode);
@@ -98,25 +105,45 @@ const Tracker = ({ item, page, detected, onChange }: Props) => {
     else setProgress(value);
   };
 
-  const toggleCompleted = async () => {
-    if (!item.is_completed && !rating) {
-      setError("pick a rating from 1 to 5");
-      return;
-    }
+  // hasil dari backend bisa mengganti season aktif, jadi angka episode ikut disamakan
+  const apply = (updated: Media | undefined) => {
+    if (!updated) return;
+    onChange(updated);
+    desired.current = saved.current = updated.last_episode;
+    setDirection(updated.last_episode >= episode ? 1 : -1);
+    setEpisode(updated.last_episode);
+    setDraft(String(updated.last_episode));
+  };
+
+  const openPanel = (next: "finish" | "next") => {
+    // season yang diulang memakai rating lamanya sebagai awal
+    setRating(active?.rating ?? 0);
+    setError("");
+    setPanel(next);
+  };
+
+  const run = async (action: (token: string) => Promise<Media | undefined>) => {
     setBusy(true);
     setError("");
     try {
-      const token = await getToken();
-      const updated = item.is_completed
-        ? await uncompleteMedia(token, item.id)
-        : await completeMedia(token, item.id, rating);
-      if (updated) onChange(updated);
-      setCompleting(false);
+      apply(await action(await getToken()));
+      setPanel(null);
     } catch {
       setError("couldn't save, try again");
     } finally {
       setBusy(false);
     }
+  };
+
+  // menyelesaikan season aktif dengan rating-nya sendiri; judul selesai kalau tidak ada season lain yang berjalan
+  const finish = () => {
+    if (!rating) return setError("pick a rating from 1 to 5");
+    void run((token) => updateSeason(token, item.id, item.season, { is_completed: true, rating }));
+  };
+
+  const goNext = (restart: boolean) => {
+    if (!rating && active?.rating == null) return setError(`rate ${unit.part} ${item.season} first`);
+    void run((token) => nextSeason(token, item.id, restart, rating || undefined));
   };
 
   return (
@@ -134,6 +161,16 @@ const Tracker = ({ item, page, detected, onChange }: Props) => {
             <span className="bg-soft px-2 py-0.5 text-[11px] font-medium tracking-wide text-body uppercase">
               {item.type === "read" ? "reading" : "watching"}
             </span>
+            {multi && (
+              <span className="border border-line-strong px-2 py-0.5 text-[11px] font-medium tracking-wide text-ink uppercase">
+                {unit.part} {item.season}
+              </span>
+            )}
+            {item.rewatch_count > 0 && (
+              <span className="flex items-center gap-1 bg-accent-soft px-2 py-0.5 text-[11px] font-medium tracking-wide text-accent uppercase">
+                <Repeat size={11} strokeWidth={2.5} /> ×{item.rewatch_count}
+              </span>
+            )}
             <AnimatePresence>
               {item.is_completed && (
                 <motion.span
@@ -167,7 +204,10 @@ const Tracker = ({ item, page, detected, onChange }: Props) => {
       </div>
 
       <div className="mt-5 border border-line bg-white p-4">
-        <span className="label text-center text-muted">last {unit.long}</span>
+        <span className="label text-center text-muted">
+          last {unit.long}
+          {multi && ` · ${unit.part} ${item.season}`}
+        </span>
         <div className="flex items-center justify-between gap-3">
           <motion.button
             type="button"
@@ -245,46 +285,83 @@ const Tracker = ({ item, page, detected, onChange }: Props) => {
       </div>
 
       <div className="mt-4">
-        {item.is_completed ? (
-          <button type="button" onClick={toggleCompleted} disabled={busy} className={btn("secondary", "lg", "w-full")}>
-            <RotateCcw size={16} /> mark as ongoing
-          </button>
-        ) : (
-          <>
-            <AnimatePresence initial={false} mode="wait">
-              {completing ? (
-                <motion.div key="rate" {...collapse} className="overflow-hidden">
-                  <div className="border border-line bg-white p-4">
-                    <span className="label">how was it?</span>
-                    <StarPicker value={rating} onChange={(r) => (setRating(r), setError(""))} />
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => (setCompleting(false), setError(""))}
-                        className={btn("secondary", "md", "flex-1")}
-                      >
-                        cancel
-                      </button>
-                      <button type="button" onClick={toggleCompleted} disabled={busy} className={btn("done", "md", "flex-1")}>
-                        <Check size={15} /> {busy ? "saving…" : "finish"}
-                      </button>
-                    </div>
+        <AnimatePresence initial={false} mode="wait">
+          {panel === "finish" ? (
+            <motion.div key="finish" {...collapse} className="overflow-hidden">
+              <div className="border border-line bg-white p-4">
+                <span className="label">{multi ? `how was ${unit.part} ${item.season}?` : "how was it?"}</span>
+                <StarPicker value={rating} onChange={(r) => (setRating(r), setError(""))} />
+                {othersRunning && (
+                  <p className="mt-2 text-xs text-muted">other {unit.part}s are still going, so it stays on your shelf.</p>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <button type="button" onClick={() => setPanel(null)} className={btn("secondary", "md", "flex-1")}>
+                    cancel
+                  </button>
+                  <button type="button" onClick={finish} disabled={busy} className={btn("done", "md", "flex-1")}>
+                    <Check size={15} /> {busy ? "saving…" : "finish"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ) : panel === "next" ? (
+            <motion.div key="next" {...collapse} className="overflow-hidden">
+              <div className="border border-line bg-white p-4">
+                <span className="label">
+                  rate {unit.part} {item.season}
+                  {active?.rating != null && <span className="font-normal text-muted"> (saved)</span>}
+                </span>
+                <StarPicker value={rating} onChange={(r) => (setRating(r), setError(""))} />
+                <p className="mt-2 mb-3 text-xs text-muted">
+                  {unit.part} {item.season} is marked finished and stays on the list.
+                </p>
+                {nextExisting ? (
+                  <button type="button" onClick={() => goNext(false)} disabled={busy} className={btn("primary", "md", "w-full")}>
+                    continue {unit.part} {item.season + 1} at {unit.short} {nextExisting.last_episode}
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <button type="button" onClick={() => goNext(false)} disabled={busy} className={btn("primary", "md", "w-full")}>
+                      keep counting · next is {unit.short} {episode + 1}
+                    </button>
+                    <button type="button" onClick={() => goNext(true)} disabled={busy} className={btn("secondary", "md", "w-full")}>
+                      start {unit.part} {item.season + 1} from 0
+                    </button>
                   </div>
-                </motion.div>
-              ) : (
-                <motion.button
-                  key="complete"
-                  {...fade}
+                )}
+                <button type="button" onClick={() => setPanel(null)} className={btn("ghost", "sm", "mt-2 w-full")}>
+                  cancel
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div key="actions" {...fade} className="flex gap-2">
+              {item.is_completed ? (
+                <button
                   type="button"
-                  onClick={() => setCompleting(true)}
-                  className={btn("done", "lg", "w-full")}
+                  onClick={() => run((token) => uncompleteMedia(token, item.id))}
+                  disabled={busy}
+                  className={btn("secondary", "lg", "flex-1")}
                 >
-                  <Check size={16} /> mark as completed
-                </motion.button>
+                  <RotateCcw size={16} /> mark as ongoing
+                </button>
+              ) : (
+                <button type="button" onClick={() => openPanel("finish")} className={btn("done", "lg", "flex-1")}>
+                  <Check size={16} /> {othersRunning ? `finish ${unit.part} ${item.season}` : "mark as completed"}
+                </button>
               )}
-            </AnimatePresence>
-          </>
-        )}
+              <button
+                type="button"
+                onClick={() => openPanel("next")}
+                aria-label={`next ${unit.part}`}
+                title={`next ${unit.part}`}
+                className={btn("secondary", "lg", "px-3.5")}
+              >
+                <Layers size={16} /> next
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {error && (
             <motion.p {...fade} className="mt-2 text-[13px] text-danger">

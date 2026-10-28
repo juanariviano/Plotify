@@ -1,4 +1,4 @@
-import type { Media, MediaType, PageInfo } from "../types";
+import type { ExternalMedia, Media, MediaType, PageInfo } from "../types";
 
 // "episode 12", "ep.12", "chapter-125", "ch 3", "bab 4", "s01e05".
 // "part" dan "page" sengaja tidak ikut: sering jadi bagian judul atau url daftar halaman
@@ -140,26 +140,44 @@ const seriesPath = (url: string) => {
   }
 };
 
-// skor kecocokan media milik user dengan halaman yang sedang dibuka
-const scoreOf = (item: Media, page: PageInfo, options: string[]) => {
+// slug yang nomor episodenya menempel di ujung tanpa kata "episode": solo-leveling-12 -> solo-leveling
+const loosePath = (path: string) => path.replace(/-\d{1,4}$/, "");
+
+/**
+ * skor kecocokan media milik user dengan halaman yang sedang dibuka
+ * 3 = halaman seri yang sama, 2 = hampir pasti sama (dipilih otomatis), 1 = mungkin sama (ditawarkan)
+ * external: hasil pencarian judul halaman ini di tmdb / anilist / open library, urut dari yang paling cocok
+ */
+const scoreOf = (item: Media, page: PageInfo, options: string[], external: ExternalMedia[]) => {
   const host = pageHost(page);
+  let score = 0;
   if (item.source && hostOf(item.source) === host && host) {
     const a = seriesPath(item.source);
     const b = seriesPath(page.url);
     if (a && b && (a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`))) return 3;
+    if (a && b && loosePath(a) === loosePath(b)) score = 2;
   }
+
+  // judul dari rekomendasi sering beda dengan judul halaman ("Solo Leveling" vs "Ore dake Level Up na Ken"),
+  // tapi id eksternalnya sama dengan hasil pencarian judul halaman ini
+  if (item.external_id) {
+    const at = external.findIndex((e) => e.external_source === item.external_source && e.external_id === item.external_id);
+    if (at === 0) return Math.max(score, 2);
+    if (at > 0) score = Math.max(score, 1);
+  }
+
   const title = normalize(item.title);
-  if (!title) return 0;
+  if (!title) return score;
   const keys = options.map(normalize);
   if (keys.includes(title)) return 2;
-  if (title.length >= 4 && keys.some((k) => k.length >= 4 && (k.includes(title) || title.includes(k)))) return 1;
-  return 0;
+  if (title.length >= 4 && keys.some((k) => k.length >= 4 && (k.includes(title) || title.includes(k)))) return Math.max(score, 1);
+  return score;
 };
 
-export const rankMatches = (items: Media[], page: PageInfo, options: string[]) => {
+export const rankMatches = (items: Media[], page: PageInfo, options: string[], external: ExternalMedia[] = []) => {
   const unique = new Map(items.map((item) => [item.id, item]));
   return [...unique.values()]
-    .map((item) => ({ item, score: scoreOf(item, page, options) }))
+    .map((item) => ({ item, score: scoreOf(item, page, options, external) }))
     .filter((m) => m.score > 0)
     .sort((a, b) => b.score - a.score || Number(a.item.is_completed) - Number(b.item.is_completed));
 };
