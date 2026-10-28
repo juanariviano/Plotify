@@ -1,12 +1,13 @@
 import { Link, NavLink, useLocation } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Menu, Plus, X } from "lucide-react";
+import { Menu, Plus, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { useProfile } from "../../hooks/useProfile";
 import { usePrefetch } from "../../hooks/usePrefetch";
 import { btn } from "../../lib/ui";
 import { easeOut } from "../../lib/motion";
+import { featuredRecapYear } from "../../lib/recap";
 import Ribbon from "./Ribbon";
 
 export const Logo = ({ light = false }: { light?: boolean }) => (
@@ -58,6 +59,8 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const prefetch = usePrefetch();
   const shelf = location.pathname.startsWith("/read") ? "read" : "screen";
+  // december and january only
+  const recapYear = featuredRecapYear();
 
   return (
     <header className="relative z-30 border-b border-line bg-paper/85 backdrop-blur-md">
@@ -91,6 +94,14 @@ const Navbar = () => {
 
         {isSignedIn ? (
           <div className="hidden items-center gap-4 sm:flex">
+            {recapYear && (
+              <Link
+                to={`/recap/${recapYear}`}
+                className="flex items-center gap-1.5 text-sm text-accent transition-colors hover:text-ink"
+              >
+                <Sparkles size={15} /> recap {recapYear}
+              </Link>
+            )}
             <Link to={`/add?item=${shelf}`} className={btn("primary", "md")}>
               <Plus size={16} strokeWidth={2.4} />
               add
@@ -146,7 +157,12 @@ const Navbar = () => {
               variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } } }}
             >
               {(isSignedIn
-                ? [...APP_LINKS, { to: "/profile", label: "profile" }, { to: `/add?item=${shelf}`, label: "add a title" }]
+                ? [
+                    ...APP_LINKS,
+                    { to: "/profile", label: "profile" },
+                    { to: `/add?item=${shelf}`, label: "add a title" },
+                    ...(recapYear ? [{ to: `/recap/${recapYear}`, label: `recap ${recapYear}` }] : []),
+                  ]
                 : [
                     { to: "/signin", label: "sign in" },
                     { to: "/signup", label: "start your shelf" },

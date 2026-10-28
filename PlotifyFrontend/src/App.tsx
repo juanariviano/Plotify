@@ -17,7 +17,12 @@ const Read = page(() => import("./page/menus/Read"));
 const Profile = page(() => import("./page/profiles/Profile"));
 const Card = page(() => import("./page/menus/Card"));
 const Add = page(() => import("./page/menus/Add"));
+const AddBulk = page(() => import("./page/menus/AddBulk"));
+const Import = page(() => import("./page/menus/Import"));
+const Recap = page(() => import("./page/recap/Recap"));
+const Donate = page(() => import("./page/menus/Donate"));
 const ChatWidget = page(() => import("./components/chat/ChatWidget"));
+const FeedbackPrompt = page(() => import("./components/feedback/FeedbackPrompt"));
 const Signin = page(() => import("./page/auth/Signin"));
 const Signup = page(() => import("./page/auth/Signup"));
 const Forgot = page(() => import("./page/auth/Forgot"));
@@ -85,6 +90,7 @@ function App() {
           />
           // public
           <Route index element={<Home />} />
+          <Route path="/donate" element={<Donate />} />
           // protected
           <Route
             path="/screen"
@@ -127,6 +133,30 @@ function App() {
             }
           />
           <Route
+            path="/add/bulk"
+            element={
+              <ProtectedRoute>
+                <AddBulk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add/import"
+            element={
+              <ProtectedRoute>
+                <Import />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recap/:year"
+            element={
+              <ProtectedRoute>
+                <Recap />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/changepassword"
             element={
               <ProtectedRoute>
@@ -148,6 +178,7 @@ function App() {
       </Suspense>
       <Suspense fallback={null}>
         <ChatWidget />
+        <FeedbackPrompt />
       </Suspense>
     </>
   );

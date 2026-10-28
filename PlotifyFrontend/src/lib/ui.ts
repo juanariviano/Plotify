@@ -1,4 +1,5 @@
 import type { Media } from "../types/media";
+import type { ExternalMedia } from "../types/chat";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "done";
 type Size = "sm" | "md" | "lg";
@@ -47,7 +48,16 @@ export const coverTone = (title: string) => {
 };
 
 export const unitOf = (type: Media["type"] | string | null) =>
-  type === "read" ? { long: "page", short: "p", plural: "pages" } : { long: "episode", short: "ep", plural: "episodes" };
+  type === "read"
+    ? { long: "page", short: "p", plural: "pages", part: "volume", partShort: "vol", again: "reread" }
+    : { long: "episode", short: "ep", plural: "episodes", part: "season", partShort: "s", again: "rewatch" };
+
+export const SOURCE_NAMES: Record<ExternalMedia["external_source"], string> = {
+  tmdb_movie: "tmdb · movie",
+  tmdb_tv: "tmdb · series",
+  anilist: "anilist",
+  openlibrary: "open library",
+};
 
 export const isUrl = (value: string | null | undefined) =>
   !!value && /^https?:\/\//i.test(value.trim());

@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useClerk } from "@clerk/clerk-react";
 import { motion } from "motion/react";
-import { ChevronRight, KeyRound, LogOut, Pencil } from "lucide-react";
+import { ArrowRight, ChevronRight, KeyRound, LogOut, Pencil, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
@@ -14,6 +14,7 @@ import { easeOut, fadeUp, stagger } from "../../lib/motion";
 import { useMediaStats } from "../../hooks/useMediaStats";
 import { useProfile } from "../../hooks/useProfile";
 import { btn, unitOf } from "../../lib/ui";
+import { featuredRecapYear, recapOpen } from "../../lib/recap";
 
 const Profile = () => {
   const { signOut } = useClerk();
@@ -50,6 +51,13 @@ const Profile = () => {
     { label: "shows finished", value: stats?.totals.screenFinished ?? 0 },
     { label: "reads finished", value: stats?.totals.readFinished ?? 0 },
   ];
+
+  // the season's recap always shows (even before anything is finished), past ones only if there's something in them
+  const featured = featuredRecapYear();
+  const recapYears = [...new Set([...(featured ? [featured] : []), ...(stats?.recapYears ?? [])])]
+    .filter((y) => recapOpen(y))
+    .sort((a, b) => b - a);
+  const [latestRecap, ...olderRecaps] = recapYears;
 
   const categoryCounts = stats?.categories ?? [];
   const topCategory = categoryCounts[0]?.[1] ?? 1;
@@ -116,6 +124,42 @@ const Profile = () => {
             </div>
           ))}
         </Reveal>
+
+        {latestRecap && (
+          <Reveal className="mb-14">
+            <Link
+              to={`/recap/${latestRecap}`}
+              className="group relative flex flex-wrap items-end justify-between gap-6 overflow-hidden bg-night p-7 text-paper sm:p-9"
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-10 -right-6 font-serif text-[180px] leading-none text-accent/25 transition-transform duration-700 ease-out-expo group-hover:-translate-x-3"
+              >
+                {latestRecap}
+              </span>
+              <span className="relative">
+                <span className="mb-2 flex items-center gap-2 font-mono text-xs text-dim">
+                  <Sparkles size={14} className="text-accent" /> recap
+                </span>
+                <span className="block font-serif text-[36px] leading-none sm:text-[44px]">your {latestRecap}, wrapped up.</span>
+                <span className="mt-2 block text-sm text-dim">what you finished, loved and kept coming back to.</span>
+              </span>
+              <span className="relative flex items-center gap-2 text-sm">
+                watch it <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+              </span>
+            </Link>
+            {olderRecaps.length > 0 && (
+              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                earlier years:
+                {olderRecaps.map((y) => (
+                  <Link key={y} to={`/recap/${y}`} className="text-ink underline-offset-4 hover:underline">
+                    {y}
+                  </Link>
+                ))}
+              </p>
+            )}
+          </Reveal>
+        )}
 
         {ongoing.length > 0 && (
           <Reveal className="mb-14">

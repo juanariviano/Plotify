@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { ArrowUpRight, LayoutGrid, List, Minus, Plus, Search, X } from "lucide-react";
+import { ArrowUpRight, Layers, LayoutGrid, List, Minus, Plus, Repeat, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
@@ -80,6 +80,39 @@ const QuickLog = ({ item, compact = false }: { item: Media; compact?: boolean })
   );
 };
 
+// season / volume past the first, and how many times it's been restarted
+const ProgressTags = ({ item, className = "" }: { item: Media; className?: string }) => {
+  const unit = unitOf(item.type);
+  const season = item.season ?? 1;
+  const rewatches = item.rewatch_count ?? 0;
+  // other seasons running alongside the active one, e.g. rewatching s1 while on s2
+  const alsoRunning = (item.seasons ?? []).filter((s) => !s.is_completed && s.season !== season).length;
+  if (season <= 1 && rewatches === 0 && !alsoRunning) return null;
+
+  return (
+    <span className={`flex flex-wrap gap-1 ${className}`}>
+      {(season > 1 || alsoRunning > 0) && (
+        <span
+          className="bg-white px-1.5 py-0.5 font-mono text-[11px] text-ink"
+          title={`${unit.part} ${season}${alsoRunning ? `, ${alsoRunning} more in progress` : ""}`}
+        >
+          {unit.partShort}
+          {season}
+          {alsoRunning > 0 && ` +${alsoRunning}`}
+        </span>
+      )}
+      {rewatches > 0 && (
+        <span
+          className="flex items-center gap-0.5 bg-accent px-1.5 py-0.5 font-mono text-[11px] text-white"
+          title={`${unit.again} ×${rewatches}`}
+        >
+          <Repeat size={10} /> {rewatches}
+        </span>
+      )}
+    </span>
+  );
+};
+
 const GridCard = ({ item, completed }: { item: Media; completed: boolean }) => {
   const unit = unitOf(item.type);
   return (
@@ -96,9 +129,10 @@ const GridCard = ({ item, completed }: { item: Media; completed: boolean }) => {
             className="aspect-[3/4] w-full shadow-[0_1px_0_rgb(23_22_15/0.06)] transition-shadow duration-500 group-hover:shadow-[0_18px_40px_-18px_rgb(23_22_15/0.45)]"
             titleClassName="text-xl"
           />
-          {completed && (
-            <span className="absolute top-2 left-2 bg-done px-2 py-0.5 text-[11px] text-white">finished</span>
-          )}
+          <span className="absolute top-2 left-2 flex flex-wrap items-center gap-1">
+            {completed && <span className="bg-done px-2 py-0.5 text-[11px] text-white">finished</span>}
+            <ProgressTags item={item} />
+          </span>
         </motion.div>
         <div className="flex flex-col gap-1 pt-3">
           <h2 className="line-clamp-2 text-[15px] leading-snug font-medium">{item.title}</h2>
@@ -131,7 +165,10 @@ const ListRow = ({ item, completed }: { item: Media; completed: boolean }) => (
     <Link to={`/card?id=${item.id}`} className="flex min-w-0 flex-1 items-center gap-4">
       <Cover title={item.title} src={item.image_url} showTitle={false} className="h-[50px] w-9 shrink-0" />
       <span className="min-w-0">
-        <span className="block truncate font-medium transition-colors group-hover:text-accent">{item.title}</span>
+        <span className="flex items-center gap-2">
+          <span className="truncate font-medium transition-colors group-hover:text-accent">{item.title}</span>
+          <ProgressTags item={item} className="shrink-0 [&>span]:border [&>span]:border-line" />
+        </span>
         <span className="block truncate text-xs text-muted">
           {item.category?.length ? item.category.join(" · ") : "no category"}
         </span>
@@ -272,10 +309,15 @@ const Shelf = ({ type }: { type: ShelfType }) => {
             <p className="eyebrow mb-2">your shelf</p>
             <h1 className="font-serif text-[56px] leading-[0.95] tracking-[-0.03em] sm:text-[72px]">{type}</h1>
           </motion.div>
-          <motion.p variants={fadeUp} className="pb-2 text-[15px] text-muted">
-            <AnimatedNumber value={ongoing.total} className="text-ink" /> in progress ·{" "}
-            <AnimatedNumber value={completed.total} className="text-ink" /> finished
-          </motion.p>
+          <motion.div variants={fadeUp} className="flex flex-col items-start gap-3 pb-2 sm:items-end">
+            <p className="text-[15px] text-muted">
+              <AnimatedNumber value={ongoing.total} className="text-ink" /> in progress ·{" "}
+              <AnimatedNumber value={completed.total} className="text-ink" /> finished
+            </p>
+            <Link to={`/add/bulk?item=${type}`} className={btn("secondary", "sm")}>
+              <Layers size={14} /> add many at once
+            </Link>
+          </motion.div>
         </motion.div>
 
         <motion.div

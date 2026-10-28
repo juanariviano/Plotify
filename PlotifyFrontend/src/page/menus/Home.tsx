@@ -1,8 +1,8 @@
 import { Link } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
-import { motion, useInView, useScroll, useTransform, type MotionValue } from "motion/react";
-import { ArrowRight, Minus, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView, useScroll, useTransform, type MotionValue } from "motion/react";
+import { ArrowRight, ArrowUpRight, Check, Minus, Plus, Puzzle, Repeat, Search, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Navbar from "../../components/ui/Navbar";
 import Footer from "../../components/ui/Footer";
 import AnimatedNumber from "../../components/ui/AnimatedNumber";
@@ -50,6 +50,24 @@ const SPINES = [
   { w: 28, h: 116, c: "#4a3a36" },
   { w: 24, h: 96, c: "#bfa98a" },
 ];
+
+const SEASONS = [
+  { n: 1, done: true, rating: 5 },
+  { n: 2, done: true, rating: 4 },
+  { n: 3, done: false, rating: 0 },
+];
+
+const COVER_TONES = ["#24395a", "#8a5a2b", "#3b4a3f", "#6b3b2b"];
+
+const PASTED = [
+  { title: "inception", tone: "#2f3b3a" },
+  { title: "parasite", tone: "#4a3a55" },
+  { title: "arrival", tone: "#4d5b6b" },
+  { title: "dune", tone: "#8a5a2b" },
+];
+
+// chrome web store link once the extension is published; empty shows "coming soon"
+const EXTENSION_URL = import.meta.env.VITE_EXTENSION_URL as string | undefined;
 
 const HEADLINE = ["remember", "where", "you"];
 const MANIFESTO = "no feed. no followers. no algorithm. just your place in everything you love.".split(" ");
@@ -221,6 +239,240 @@ const GrowingShelf = () => {
   );
 };
 
+// shared frame for the feature tiles; children animate once the tile scrolls in
+const FeatureFrame = ({ children }: { children: (inView: boolean) => ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "0px 0px -80px 0px" });
+  return (
+    <div ref={ref} className="flex h-[188px] flex-col justify-center gap-3 border border-line bg-paper p-5" aria-hidden="true">
+      {children(inView)}
+    </div>
+  );
+};
+
+const SeasonsVisual = () => (
+  <FeatureFrame>
+    {(inView) =>
+      SEASONS.map((s, i) => (
+        <motion.div
+          key={s.n}
+          initial={{ opacity: 0, x: -14 }}
+          animate={inView ? { opacity: 1, x: 0 } : {}}
+          transition={{ duration: 0.5, ease: easeOut, delay: 0.15 + i * 0.15 }}
+          className={`flex h-10 items-center gap-3 border px-3 text-sm ${s.done ? "border-line bg-white" : "border-ink bg-ink text-white"}`}
+        >
+          <span className="font-mono">s{s.n}</span>
+          <span className={`h-2 w-2 ${s.done ? "bg-done" : "bg-accent"}`} />
+          <span className="flex-1 text-[13px] opacity-70">{s.done ? "finished" : "watching · ep 4"}</span>
+          {s.done && <StarDisplay rating={inView ? s.rating : 0} size={12} />}
+        </motion.div>
+      ))
+    }
+  </FeatureFrame>
+);
+
+const RewatchVisual = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const [again, setAgain] = useState(false);
+
+  useEffect(() => {
+    if (!inView) return;
+    const timer = window.setInterval(() => setAgain((v) => !v), 2200);
+    return () => window.clearInterval(timer);
+  }, [inView]);
+
+  return (
+    <div ref={ref} className="flex h-[188px] flex-col items-center justify-center gap-3 border border-line bg-paper p-5" aria-hidden="true">
+      <span className="flex h-6 items-center gap-2 text-xs">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={again ? "again" : "done"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+            transition={{ duration: 0.35, ease: easeOut }}
+            className={`flex items-center gap-1 px-2.5 py-1 ${again ? "bg-accent-soft text-accent" : "bg-done text-white"}`}
+          >
+            {again ? (
+              <>
+                <Repeat size={12} /> rewatch ×2
+              </>
+            ) : (
+              <>
+                <Check size={12} /> finished
+              </>
+            )}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+      <span className="font-serif text-[56px] leading-none">
+        <span className="mr-2 text-[22px] text-muted">ep</span>
+        <AnimatedNumber value={again ? 0 : 24} direction={again ? -1 : 1} />
+      </span>
+      <span className="text-[13px] text-muted">your 5/5 stays put</span>
+    </div>
+  );
+};
+
+const CoversVisual = () => (
+  <FeatureFrame>
+    {(inView) => (
+      <>
+        <span className="flex h-9 items-center gap-2 border border-line-strong bg-white px-3 text-sm">
+          <Search size={14} className="text-muted" /> dune
+        </span>
+        <div className="grid grid-cols-4 gap-2">
+          {COVER_TONES.map((tone, i) => (
+            <motion.span
+              key={tone}
+              initial={{ opacity: 0, y: 10 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.5, ease: easeOut, delay: 0.2 + i * 0.1 }}
+              className={`relative block aspect-[3/4] ${i === 1 ? "outline-2 outline-offset-2 outline-accent" : ""}`}
+              style={{ background: tone }}
+            >
+              {i === 1 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={inView ? { scale: 1 } : {}}
+                  transition={{ type: "spring", stiffness: 400, damping: 18, delay: 0.8 }}
+                  className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center bg-accent text-white"
+                >
+                  <Check size={12} />
+                </motion.span>
+              )}
+            </motion.span>
+          ))}
+        </div>
+      </>
+    )}
+  </FeatureFrame>
+);
+
+const BulkVisual = () => (
+  <FeatureFrame>
+    {(inView) =>
+      PASTED.map((row, i) => (
+        <div key={row.title} className="flex h-7 items-center gap-3 font-mono text-[13px]">
+          <motion.span
+            initial={{ scaleY: 0 }}
+            animate={inView ? { scaleY: 1 } : {}}
+            transition={{ duration: 0.4, ease: easeOut, delay: 0.5 + i * 0.18 }}
+            className="block h-7 w-5 origin-bottom"
+            style={{ background: row.tone }}
+          />
+          <span className="flex-1">{row.title}</span>
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ delay: 0.7 + i * 0.18 }}
+            className="text-done"
+          >
+            <Check size={14} />
+          </motion.span>
+        </div>
+      ))
+    }
+  </FeatureFrame>
+);
+
+const AskVisual = () => (
+  <FeatureFrame>
+    {(inView) => (
+      <>
+        <motion.span
+          initial={{ opacity: 0, y: 8 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, ease: easeOut, delay: 0.2 }}
+          className="self-end bg-ink px-3 py-2 text-[13px] text-white"
+        >
+          what did i rate highest?
+        </motion.span>
+        <motion.span
+          initial={{ opacity: 0, y: 8 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, ease: easeOut, delay: 0.9 }}
+          className="flex items-center gap-2 self-start border border-line bg-white px-3 py-2 text-[13px]"
+        >
+          <Sparkles size={13} className="text-accent" /> frieren, season 1 · 5/5
+        </motion.span>
+      </>
+    )}
+  </FeatureFrame>
+);
+
+const ExtensionVisual = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const [ep, setEp] = useState(5);
+
+  useEffect(() => {
+    if (!inView) return;
+    const timer = window.setInterval(() => setEp((v) => (v >= 8 ? 5 : v + 1)), 1600);
+    return () => window.clearInterval(timer);
+  }, [inView]);
+
+  return (
+    <div ref={ref} className="flex h-[188px] items-center justify-center border border-line bg-paper p-5" aria-hidden="true">
+      <div className="w-[230px] border border-line bg-white shadow-[0_18px_40px_-20px_rgb(23_22_15/0.45)]">
+        <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+          <span className="ribbon block h-3.5 w-2 bg-accent" />
+          <span className="font-serif text-sm">plotify</span>
+          <span className="ml-auto font-mono text-[10px] text-muted">crunchyroll.com</span>
+        </div>
+        <div className="flex items-center gap-3 px-3 py-3">
+          <span className="h-[52px] w-9 shrink-0 bg-[#5a6a4d]" />
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium">frieren</span>
+            <span className="font-mono text-[11px] text-muted">season 2</span>
+          </div>
+          <span className="font-serif text-[30px] leading-none">
+            <AnimatedNumber value={ep} />
+          </span>
+          <motion.span
+            key={ep}
+            initial={{ scale: 0.85 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.3, ease: easeOut }}
+            className="flex h-8 w-8 items-center justify-center bg-ink text-white"
+          >
+            <Plus size={14} />
+          </motion.span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FEATURES = [
+  {
+    visual: SeasonsVisual,
+    title: "every season, kept",
+    text: "move on to season two and season one stays on the list, with its own episodes and its own rating. switch back anytime.",
+  },
+  {
+    visual: RewatchVisual,
+    title: "watch it again",
+    text: "start a rewatch or reread from season one or any season you pick. it counts how many times, and keeps your old rating.",
+  },
+  {
+    visual: CoversVisual,
+    title: "covers, found for you",
+    text: "type a title and pick its cover from tmdb, anilist or open library. or drop your own image and crop it to fit.",
+  },
+  {
+    visual: BulkVisual,
+    title: "bring your whole list",
+    text: "paste everything you've already watched or read, one per line. each title gets matched, and you can fix anything before it's added.",
+  },
+  {
+    visual: AskVisual,
+    title: "ask your shelf",
+    text: "a small assistant that knows only your list. ask what to pick up next, or what you thought of something.",
+  },
+];
+
 const ManifestoWord = ({ word, index, total, progress }: { word: string; index: number; total: number; progress: MotionValue<number> }) => {
   const start = index / total;
   const opacity = useTransform(progress, [start, start + 1 / total], [0.18, 1]);
@@ -377,7 +629,7 @@ const Home = () => {
                 <div>
                   <span className="font-mono text-xs text-muted">01</span>
                   <h3 className="mt-1.5 mb-2 font-serif text-[28px]">add it</h3>
-                  <p className="text-[15px] leading-relaxed text-body">a title, a shelf, and where you watch or read it. a cover if you like.</p>
+                  <p className="text-[15px] leading-relaxed text-body">a title, a shelf, and where you watch or read it. the cover finds itself.</p>
                 </div>
               </Reveal>
               <Reveal className="flex flex-col gap-5" delay={0.1}>
@@ -393,7 +645,7 @@ const Home = () => {
                 <div>
                   <span className="font-mono text-xs text-muted">03</span>
                   <h3 className="mt-1.5 mb-2 font-serif text-[28px]">finish it</h3>
-                  <p className="text-[15px] leading-relaxed text-body">rate it out of five and it joins your finished shelf.</p>
+                  <p className="text-[15px] leading-relaxed text-body">rate it out of five, one season at a time, and it joins your finished shelf.</p>
                 </div>
               </Reveal>
             </div>
@@ -429,6 +681,52 @@ const Home = () => {
                 </motion.ul>
               </Reveal>
             ))}
+          </div>
+        </section>
+
+        <section id="more" className="border-y border-line bg-white">
+          <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-10">
+            <Reveal className="mb-12 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow mb-4">and a little more</p>
+                <h2 className="font-serif text-[40px] leading-[1.04] tracking-[-0.025em] sm:text-[52px]">more than a counter.</h2>
+              </div>
+              <p className="max-w-[380px] leading-relaxed text-body">
+                long series, second viewings, a backlog from somewhere else. plotify keeps up with all of it.
+              </p>
+            </Reveal>
+            <div className="grid gap-x-8 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map((f, i) => (
+                <Reveal key={f.title} className="flex flex-col gap-5" delay={(i % 3) * 0.1}>
+                  <f.visual />
+                  <div>
+                    <span className="font-mono text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
+                    <h3 className="mt-1.5 mb-2 font-serif text-[28px]">{f.title}</h3>
+                    <p className="text-[15px] leading-relaxed text-body">{f.text}</p>
+                  </div>
+                </Reveal>
+              ))}
+              <Reveal className="flex flex-col gap-5" delay={0.2}>
+                <ExtensionVisual />
+                <div>
+                  <span className="font-mono text-xs text-muted">06</span>
+                  <h3 className="mt-1.5 mb-2 font-serif text-[28px]">log it from the tab</h3>
+                  <p className="text-[15px] leading-relaxed text-body">
+                    a chrome extension that finds the title on the page you're on. +1, finish the season or start the
+                    next one, without opening plotify.
+                  </p>
+                  {EXTENSION_URL ? (
+                    <a href={EXTENSION_URL} target="_blank" rel="noreferrer" className={btn("secondary", "md", "mt-4")}>
+                      <Puzzle size={15} /> add to chrome <ArrowUpRight size={15} />
+                    </a>
+                  ) : (
+                    <span className="mt-4 inline-flex items-center gap-2 font-mono text-xs text-muted">
+                      <Puzzle size={13} /> coming soon to the chrome web store
+                    </span>
+                  )}
+                </div>
+              </Reveal>
+            </div>
           </div>
         </section>
 

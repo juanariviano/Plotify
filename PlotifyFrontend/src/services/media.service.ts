@@ -6,8 +6,10 @@ import type {
   PaginatedMediaResponse,
   UncompleteMediaPayload,
   UpdateMediaPayload,
+  BulkMediaItem,
   Media,
   MediaStats,
+  Recap,
 } from "../types/media";
 import type { ExternalMedia } from "../types/chat";
 
@@ -204,6 +206,109 @@ export const deleteMedia = async ({
       },
     }
   );
+
+  return res.data;
+};
+
+// skipExisting leaves out titles already on the shelf; the answer only holds what was added
+export const createMediaBulk = async (
+  token: string,
+  items: BulkMediaItem[],
+  { skipExisting = false } = {},
+): Promise<Media[]> => {
+  const res = await axios.post(
+    `${import.meta.env.VITE_BACKEND_URL}/media/bulk`,
+    { items, ...(skipExisting ? { skip_existing: true } : {}) },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return res.data;
+};
+
+// every season call answers with the whole title, seasons included
+const seasonRequest = async (
+  token: string,
+  method: "post" | "put" | "delete",
+  path: string,
+  body?: object,
+): Promise<Media[]> => {
+  const res = await axios.request({
+    method,
+    url: `${import.meta.env.VITE_BACKEND_URL}/media/${path}`,
+    data: body,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data;
+};
+
+// active season is marked finished with its rating (required if it has none yet);
+// restart: true starts the next one at 0, false keeps counting from the last episode
+export const nextSeason = (token: string, id: number, restart: boolean, rating?: number) =>
+  seasonRequest(token, "post", `${id}/seasons/next`, { restart, ...(rating ? { rating } : {}) });
+
+export const addSeason = (
+  token: string,
+  id: number,
+  season: { season: number; last_episode: number; is_completed: boolean; rating?: number },
+) => seasonRequest(token, "post", `${id}/seasons`, season);
+
+// a finished season needs a rating, sent here or already saved
+export const updateSeason = (
+  token: string,
+  id: number,
+  season: number,
+  changes: { last_episode?: number; is_completed?: boolean; rating?: number },
+) => seasonRequest(token, "put", `${id}/seasons/${season}`, changes);
+
+export const switchSeason = (token: string, id: number, season: number) =>
+  seasonRequest(token, "put", `${id}/seasons/${season}/switch`);
+
+// a finished season back to episode 0; rewatch counts go up, rating is kept
+export const rewatchSeason = (token: string, id: number, season: number) =>
+  seasonRequest(token, "put", `${id}/seasons/${season}/rewatch`);
+
+export const deleteSeason = (token: string, id: number, season: number) =>
+  seasonRequest(token, "delete", `${id}/seasons/${season}`);
+
+export type MatchKind = "movie" | "anime" | "manga" | "book";
+export type MatchQuery = { title?: string; year?: string | null; mal_id?: number | null; isbn?: string | null };
+// a book can come back with a cover but no open library work to link
+export type MatchResult = Omit<ExternalMedia, "external_source" | "external_id"> & {
+  external_source: ExternalMedia["external_source"] | null;
+  external_id: string | null;
+};
+
+// covers, genres and ids for up to 50 imported titles at once; null where nothing matched
+export const matchMedia = async (token: string, kind: MatchKind, items: MatchQuery[]): Promise<(MatchResult | null)[]> => {
+  const res = await axios.post(
+    `${import.meta.env.VITE_BACKEND_URL}/media/match`,
+    { kind, items },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return res.data;
+};
+
+// tz keeps the year, months and weekdays on their local clock
+export const getRecap = async (token: string, year: number, signal?: AbortSignal): Promise<Recap> => {
+  const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/media/recap/${year}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params: { tz: new Date().getTimezoneOffset() },
+    signal,
+  });
 
   return res.data;
 };

@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
+import { openFeedback } from "../../lib/feedback";
 
 const Footer = () => {
   const { isSignedIn } = useAuth();
@@ -14,6 +15,9 @@ const Footer = () => {
               <Link to="/screen" className="transition-colors hover:text-ink">screen</Link>
               <Link to="/read" className="transition-colors hover:text-ink">read</Link>
               <Link to="/profile" className="transition-colors hover:text-ink">profile</Link>
+              <button type="button" onClick={openFeedback} className="lowercase transition-colors hover:text-ink">
+                rate
+              </button>
             </>
           ) : (
             <>
@@ -21,6 +25,7 @@ const Footer = () => {
               <Link to="/signup" className="transition-colors hover:text-ink">create account</Link>
             </>
           )}
+          <Link to="/donate" className="text-accent transition-colors hover:text-ink">support</Link>
         </nav>
         <span>a personal media journal</span>
       </div>

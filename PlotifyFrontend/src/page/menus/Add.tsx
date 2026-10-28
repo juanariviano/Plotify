@@ -2,7 +2,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@clerk/clerk-react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { ImageUp, Link2, Minus, Plus, X } from "lucide-react";
+import { Crop, ImageUp, ImageOff, Layers, Link2, Minus, Plus, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createMedia, lookupMedia, uploadThumbnail } from "../../services/media.service";
 import type { ExternalMedia } from "../../types/chat";
@@ -11,24 +11,20 @@ import Footer from "../../components/ui/Footer";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import Cover from "../../components/ui/Cover";
 import TagInput from "../../components/ui/TagInput";
+import CoverSearch from "../../components/ui/CoverSearch";
+import ImageCropper from "../../components/ui/ImageCropper";
 import AnimatedNumber from "../../components/ui/AnimatedNumber";
 import { easeOut, fadeUp, stagger } from "../../lib/motion";
-import { btn, sourceLabel, unitOf } from "../../lib/ui";
+import { btn, SOURCE_NAMES, sourceLabel, unitOf } from "../../lib/ui";
 import { requireToken } from "../../lib/queries";
 import { addMedia, refreshMedia } from "../../lib/mediaCache";
+import { useFileDrop } from "../../hooks/useFileDrop";
 
 type ShelfType = "screen" | "read";
 
 const SOURCE_CHIPS: Record<ShelfType, string[]> = {
   screen: ["netflix", "crunchyroll", "prime video", "disney+", "youtube"],
   read: ["kindle", "mangadex", "webtoon", "paperback", "library"],
-};
-
-const SOURCE_NAMES: Record<ExternalMedia["external_source"], string> = {
-  tmdb_movie: "tmdb · movie",
-  tmdb_tv: "tmdb · series",
-  anilist: "anilist",
-  openlibrary: "open library",
 };
 
 const Add = () => {
@@ -44,16 +40,30 @@ const Add = () => {
   const [category, setCategory] = useState<string[]>([]);
   const [source, setSource] = useState("");
   const [lastEpisode, setLastEpisode] = useState("0");
+  const [season, setSeason] = useState("1");
   const [direction, setDirection] = useState<1 | -1>(1);
+  // imageFile is the cropped upload; sourceFile is the original, kept so the crop can be adjusted
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [pickedCover, setPickedCover] = useState<string | null>(null);
+  const [noCover, setNoCover] = useState(false);
+  const [showCoverSearch, setShowCoverSearch] = useState(false);
   const [errors, setErrors] = useState({ title: "", lastEpisode: "" });
   const [lookupTitle, setLookupTitle] = useState("");
   const [linked, setLinked] = useState<ExternalMedia | null>(null);
 
   const unit = unitOf(item);
   const preview = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
-  const coverSrc = preview || linked?.image_url || null;
+  const recommended = linked?.image_url ?? null;
+  const coverSrc = noCover ? null : preview || pickedCover || recommended;
+  const coverLabel = noCover || !coverSrc
+    ? "default cover"
+    : imageFile
+      ? "your image"
+      : pickedCover
+        ? "picked cover"
+        : `cover from ${linked ? SOURCE_NAMES[linked.external_source] : "search"}`;
 
   // cari judul di tmdb / anilist / open library setelah user berhenti mengetik
   useEffect(() => {
@@ -99,8 +109,25 @@ const Add = () => {
     if (errors.lastEpisode) setErrors((e) => ({ ...e, lastEpisode: "" }));
   };
 
+  // a new image goes through the cropper first
   const takeFile = (file: File | undefined) => {
-    if (file && file.type.startsWith("image/")) setImageFile(file);
+    if (file && file.type.startsWith("image/")) setCropFile(file);
+  };
+  const { dragging, dropProps } = useFileDrop(setCropFile);
+
+  const applyCrop = (cropped: File) => {
+    setSourceFile(cropFile);
+    setImageFile(cropped);
+    setPickedCover(null);
+    setNoCover(false);
+    setCropFile(null);
+  };
+
+  const clearCover = ({ none }: { none: boolean }) => {
+    setImageFile(null);
+    setSourceFile(null);
+    setPickedCover(null);
+    setNoCover(none);
   };
 
   const validate = () => {
@@ -121,7 +148,7 @@ const Add = () => {
       const token = await getToken();
       if (!token) return;
 
-      let imageUrl = linked?.image_url ?? null;
+      let imageUrl = noCover ? null : (pickedCover ?? recommended);
       if (imageFile) {
         imageUrl = await uploadThumbnail({ token, file: imageFile });
       }
@@ -134,6 +161,7 @@ const Add = () => {
           category,
           source,
           last_episode: Number(lastEpisode),
+          season: Math.min(1000, Math.max(1, Math.trunc(Number(season)) || 1)),
           type: item,
           image_url: imageUrl,
           external_source: linked?.external_source ?? null,
@@ -165,7 +193,10 @@ const Add = () => {
             add a title.
           </motion.h1>
           <motion.p variants={fadeUp} className="mb-10 text-muted">
-            only the name and where you are matter. everything else can wait.
+            only the name and where you are matter. everything else can wait.{" "}
+            <Link to={`/add/bulk?item=${item}`} className="inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline">
+              <Layers size={14} /> moving a whole list? add many at once
+            </Link>
           </motion.p>
         </motion.div>
 
@@ -314,6 +345,19 @@ const Add = () => {
                   </motion.button>
                 </div>
               </div>
+              <div>
+                <label htmlFor="add-season" className="label mb-2.5">{unit.part}</label>
+                <input
+                  id="add-season"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={1000}
+                  value={season}
+                  onChange={(e) => setSeason(e.target.value)}
+                  className="field h-11 w-20 text-center font-mono"
+                />
+              </div>
               <p className="max-w-[260px] text-sm text-muted">
                 the last {unit.long} you finished. leave it at 0 if you haven't started.
               </p>
@@ -376,35 +420,82 @@ const Add = () => {
               </span>
               <label
                 htmlFor="add-file"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  takeFile(e.dataTransfer.files?.[0]);
-                }}
+                {...dropProps}
                 className={`flex h-28 cursor-pointer items-center justify-center gap-3 border border-dashed text-sm transition-colors ${
                   dragging ? "border-accent bg-accent-soft text-accent" : "border-[#b9b3a4] bg-white text-body hover:border-ink"
                 }`}
               >
                 <ImageUp size={20} />
-                {imageFile ? imageFile.name : "drop an image, or click to upload"}
+                {imageFile ? "drop or click to use another image" : "drop an image, or click to upload"}
                 <input
                   id="add-file"
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={(e) => takeFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    takeFile(e.target.files?.[0]);
+                    // lets the same file be picked again after cancelling the cropper
+                    e.target.value = "";
+                  }}
                 />
               </label>
-              {imageFile && (
-                <button type="button" className={btn("ghost", "sm", "mt-1 px-0")} onClick={() => setImageFile(null)}>
-                  <X size={14} /> remove image
+
+              <p className="mt-2.5 mb-2 font-mono text-[11px] text-muted">using: {coverLabel}</p>
+              <div className="flex flex-wrap gap-2">
+                {imageFile && sourceFile && (
+                  <button type="button" className={btn("secondary", "sm")} onClick={() => setCropFile(sourceFile)}>
+                    <Crop size={14} /> adjust crop
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-expanded={showCoverSearch}
+                  className={btn(showCoverSearch ? "primary" : "secondary", "sm")}
+                  onClick={() => setShowCoverSearch((v) => !v)}
+                >
+                  <Search size={14} /> find a cover
                 </button>
-              )}
+                {recommended && coverSrc !== recommended && (
+                  <button type="button" className={btn("secondary", "sm")} onClick={() => clearCover({ none: false })}>
+                    <Sparkles size={14} /> use recommended cover
+                  </button>
+                )}
+                {coverSrc && (
+                  <button type="button" className={btn("ghost", "sm")} onClick={() => clearCover({ none: true })}>
+                    <ImageOff size={14} /> use default cover
+                  </button>
+                )}
+              </div>
+
+              <AnimatePresence initial={false}>
+                {showCoverSearch && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-3 overflow-hidden"
+                  >
+                    <CoverSearch
+                      initialQuery={title}
+                      type={item}
+                      onPick={(m) => {
+                        clearCover({ none: false });
+                        setPickedCover(m.image_url);
+                        setShowCoverSearch(false);
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <ImageCropper
+                file={cropFile}
+                aspect={3 / 4}
+                outputWidth={600}
+                title="frame your cover"
+                onCancel={() => setCropFile(null)}
+                onDone={applyCrop}
+              />
             </motion.div>
 
             <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-3 border-t border-line pt-7">
