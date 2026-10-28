@@ -7,11 +7,26 @@ import authRoutes from "./routes/authRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 import attachUserId from "./middleware/attachUserId.js";
+import { rateLimit } from "./middleware/rateLimit.js";
 
 const app = express();
 app.disable("x-powered-by");
 const PORT = process.env.PORT || 8080;
+
+// header keamanan untuk API JSON: tidak boleh di-iframe, tidak boleh ditebak tipe kontennya,
+// dan kalau respon dibuka langsung di browser, tidak ada script / resource yang boleh jalan
+app.use((_req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+  });
+  next();
+});
 
 const allowedOrigins = [
   "https://yourplotify.site",
@@ -33,8 +48,13 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Retry-After"],
   }),
 );
+
+// batas kasar per IP untuk semua endpoint. setelah cors supaya browser tetap bisa membaca 429-nya,
+// sebelum clerk supaya flood tidak sampai ke verifikasi token
+app.use(rateLimit({ name: "ip", limit: 300, windowSec: 60, by: "ip" }));
 
 // token yang rusak/tidak valid membuat clerk melempar error → balas 401, bukan 500
 const clerk = clerkMiddleware();
@@ -62,6 +82,7 @@ app.use("/auth", authMiddleware, authRoutes);
 app.use("/media", authMiddleware, attachUserId, mediaRoutes);
 app.use("/profile", authMiddleware, attachUserId, profileRoutes);
 app.use("/chat", authMiddleware, attachUserId, chatRoutes);
+app.use("/feedback", authMiddleware, attachUserId, feedbackRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

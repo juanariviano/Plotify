@@ -4,9 +4,10 @@ import { clerkClient } from "@clerk/express";
 import { getAuth } from "@clerk/express";
 
 import { handleUpload } from "../middleware/upload.js";
-import { forgetUserId } from "../middleware/attachUserId.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { uploadImage, removeImage } from "../utils/storageHelper.js";
 import { validateName } from "../utils/validate.js";
+import { deleteUserData } from "../utils/userData.js";
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ const router = express.Router();
  */
 router.post(
   "/upload-profile-image",
+  rateLimit({ name: "profile-upload", limit: 20, windowSec: 60 * 10 }),
   handleUpload("profile_image"), // middleware
   async (req, res) => {
     // controller
@@ -56,7 +58,7 @@ router.post(
  * username disini itu tidak boleh sama
  * email tidak diambil dari body, tapi dari primary email di clerk (yang sudah diverifikasi)
  */
-router.put("/edit", async (req, res) => {
+router.put("/edit", rateLimit({ name: "profile-edit", limit: 20, windowSec: 60 * 10 }), async (req, res) => {
   const { fullname, username } = req.body;
 
   const invalid = validateName({ fullname, username });
@@ -129,36 +131,15 @@ router.delete("/deleteprofilepic", async (req, res) => {
 
 // delete account
 /**
- * delete account sepenuhnya ditangani clerk
- * tapi ini buat delete data dari tabel users
+ * hapus user di clerk, lalu semua datanya di plotify (file, media, baris users).
+ * kalau langkah kedua gagal, webhook user.deleted dari clerk akan membersihkannya
  */
 router.delete("/delete", async (req, res) => {
   try {
     const { userId: clerkId } = getAuth(req);
 
-    const { data: userData } = await supabase
-      .from("users")
-      .select("profile_image_url")
-      .eq("id", req.userId)
-      .single();
-
-    // hapus profile image dari storage kalau ada
-    if (userData?.profile_image_url) {
-      await removeImage(userData.profile_image_url);
-    }
-
-    // hapus user di clerk
     await clerkClient.users.deleteUser(clerkId);
-
-    // hapus data user di supabase
-    const { error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", req.userId);
-
-    if (error) throw error;
-
-    forgetUserId(clerkId);
+    await deleteUserData(clerkId);
 
     res.json({ message: "Account deleted successfully" });
   } catch (err) {

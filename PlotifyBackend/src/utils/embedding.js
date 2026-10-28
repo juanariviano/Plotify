@@ -52,3 +52,26 @@ export async function refreshMediaEmbedding(media) {
     console.error(`embedding gagal untuk media ${media.id}:`, error.message);
   }
 }
+
+/**
+ * sama seperti refreshMediaEmbedding, tapi banyak media dalam satu panggilan gemini (dipakai bulk add)
+ */
+export async function refreshMediaEmbeddings(mediaList) {
+  if (!mediaList.length) return;
+
+  try {
+    const res = await ai.models.embedContent({
+      model: process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001",
+      contents: mediaList.map(buildMediaText),
+      config: { outputDimensionality: DIMENSIONS, taskType: "RETRIEVAL_DOCUMENT" },
+    });
+
+    await Promise.all(
+      mediaList.map((media, i) =>
+        supabase.from("media").update({ embedding: res.embeddings[i].values }).eq("id", media.id),
+      ),
+    );
+  } catch (error) {
+    console.error(`embedding gagal untuk ${mediaList.length} media:`, error.message);
+  }
+}

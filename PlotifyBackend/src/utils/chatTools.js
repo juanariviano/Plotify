@@ -8,7 +8,7 @@ import {
 import { EXTERNAL_SOURCES } from "./validate.js";
 
 const SHELF_FIELDS =
-  "id, title, description, category, type, source, last_episode, is_completed, rating, external_source, external_id, created_at";
+  "id, title, description, category, type, source, last_episode, season, rewatch_count, is_completed, rating, external_source, external_id, created_at";
 
 
 /**

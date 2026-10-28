@@ -44,3 +44,22 @@ export const removeOwnImage = async (url, userId) => {
 
   await supabase.storage.from(BUCKET).remove([path]);
 };
+
+// hapus semua file milik satu user (cover media + foto profil), dipakai saat akun dihapus
+export const removeUserFiles = async (userId) => {
+  for (const folder of ["media", "profile"]) {
+    const prefix = `${folder}/${userId}`;
+    // list dibatasi per halaman, jadi ulangi sampai foldernya kosong
+    for (;;) {
+      const { data, error } = await supabase.storage.from(BUCKET).list(prefix, { limit: 100 });
+      if (error) throw error;
+      if (!data?.length) break;
+
+      const { error: removeError } = await supabase.storage
+        .from(BUCKET)
+        .remove(data.map((f) => `${prefix}/${f.name}`));
+      if (removeError) throw removeError;
+      if (data.length < 100) break;
+    }
+  }
+};
