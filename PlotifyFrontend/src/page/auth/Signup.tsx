@@ -30,15 +30,11 @@ const Signup = () => {
   const [error, setError] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(
-    sessionStorage.getItem("google_oauth_loading") === "true",
-  );
+  const [googleLoading, setGoogleLoading] = useState(false);
 
+  // a flag left over from a google redirect that didn't finish
   useEffect(() => {
     sessionStorage.removeItem("google_oauth_loading");
-
-    setLoading(false);
-    setGoogleLoading(false);
   }, []);
 
   const checks = passwordChecks(password);

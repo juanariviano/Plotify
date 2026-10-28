@@ -24,7 +24,6 @@ const VerifySignup = () => {
   const [checkingUser, setCheckingUser] = useState(method === "oauth");
 
   useEffect(() => {
-    setLoading(false);
     if (!isLoaded || !user?.id) return;
 
     const checkUser = async () => {
