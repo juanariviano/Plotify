@@ -74,15 +74,16 @@ const EditProfile = () => {
     document.title = "settings · plotify";
   }, []);
 
-  useEffect(() => {
-    if (!profile) return;
-
+  // the form starts from the saved profile, and again whenever it changes (after a save or a refetch)
+  const [syncedProfile, setSyncedProfile] = useState<typeof profile>(undefined);
+  if (profile && profile !== syncedProfile) {
+    setSyncedProfile(profile);
     setCurrImage(profile.profile_image_url);
     setUsername(profile.username);
     setFullname(profile.fullname);
     setEmail(profile.email);
     setOldEmail(profile.email);
-  }, [profile]);
+  }
 
   // a new photo goes through the cropper first; the original is kept so the crop can be adjusted
   const [cropFile, setCropFile] = useState<File | null>(null);

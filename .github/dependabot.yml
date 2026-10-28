@@ -1,4 +1,4 @@
-# pull request mingguan untuk update dependency; patch & minor digabung jadi satu PR per folder
+# pull request mingguan untuk update dependency; patch & minor digabung jadi satu PR, versi mayor tidak
 version: 2
 updates:
   - package-ecosystem: npm
@@ -12,6 +12,11 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # versi mayor sering bentrok peer dependency atau butuh perubahan kode, jadi dikerjakan manual.
+    # celah keamanan tetap ketahuan: CI menjalankan npm audit
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
