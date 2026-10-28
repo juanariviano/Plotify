@@ -36,7 +36,8 @@ const persister = createSyncStoragePersister({
 export const persistOptions: PersistQueryClientProviderProps["persistOptions"] = {
   persister,
   maxAge: DAY,
-  buster: "1",
+  // bump when the shape of cached data changes (3: media gained its seasons list)
+  buster: "3",
   dehydrateOptions: {
     // only finished shelf/profile data; search results are throwaway
     shouldDehydrateQuery: (query) => {

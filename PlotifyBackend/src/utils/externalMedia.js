@@ -299,3 +299,108 @@ export async function getRecommendations(source, id) {
 
   throw new Error(`sumber tidak dikenal: ${source}`);
 }
+
+// ---------------------------------------------------------------------------
+// pencocokan massal untuk import dari aplikasi lain (POST /media/match)
+// ---------------------------------------------------------------------------
+
+export const MATCH_KINDS = ["movie", "anime", "manga", "book"];
+
+// jalankan fn untuk tiap item, paling banyak `limit` sekaligus; urutan hasil sama dengan input
+const mapLimit = async (items, limit, fn) => {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]).catch(() => null);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
+
+// hasil search tmdb hanya berisi id genre; daftar namanya diambil sekali per instance
+let movieGenres = null;
+const getMovieGenres = async () => {
+  if (!movieGenres) {
+    const json = await tmdbFetch("/genre/movie/list");
+    movieGenres = new Map((json.genres || []).map((g) => [g.id, g.name]));
+  }
+  return movieGenres;
+};
+
+// film letterboxd: judul + tahun rilis, coba tanpa tahun kalau tidak ketemu
+async function matchMovie({ title, year }) {
+  const search = (withYear) => {
+    const params = new URLSearchParams({ query: title });
+    if (withYear) params.set("primary_release_year", year);
+    return tmdbFetch(`/search/movie?${params}`);
+  };
+
+  let json = await search(!!year);
+  if (!json.results?.length && year) json = await search(false);
+  const r = json.results?.[0];
+  if (!r) return null;
+
+  const genres = await getMovieGenres().catch(() => new Map());
+  const names = (r.genre_ids || []).map((id) => genres.get(id)).filter(Boolean);
+  return fromTmdb({ ...r, genres: names.map((name) => ({ name })) }, "movie");
+}
+
+// myanimelist: anilist menyimpan id MAL, jadi satu query cukup untuk semua item
+async function matchMal(items, kind) {
+  const ids = [...new Set(items.map((i) => i.mal_id).filter(Boolean))];
+  if (!ids.length) return items.map(() => null);
+
+  const data = await anilistFetch(
+    `query ($ids: [Int], $type: MediaType) {
+      Page(perPage: 50) { media(idMal_in: $ids, type: $type) { idMal ${ANILIST_FIELDS} } }
+    }`,
+    { ids, type: kind === "anime" ? "ANIME" : "MANGA" },
+  );
+  const byMal = new Map(data.Page.media.map((m) => [m.idMal, fromAnilist(m)]));
+  return items.map((i) => byMal.get(i.mal_id) ?? null);
+}
+
+// goodreads: open library bisa mencari banyak ISBN dalam satu request
+async function matchBooks(items) {
+  const isbns = [...new Set(items.map((i) => i.isbn).filter(Boolean))];
+  if (!isbns.length) return items.map(() => null);
+
+  const params = new URLSearchParams({
+    bibkeys: isbns.map((isbn) => `ISBN:${isbn}`).join(","),
+    format: "json",
+    jscmd: "details",
+  });
+  const res = await fetch(`https://openlibrary.org/api/books?${params}`);
+  if (!res.ok) throw new Error(`Open Library ${res.status}`);
+  const json = await res.json();
+
+  return items.map((i) => {
+    const d = i.isbn && json[`ISBN:${i.isbn}`]?.details;
+    if (!d) return null;
+    const work = d.works?.[0]?.key;
+    const linked = isValidExternalId("openlibrary", work);
+    return {
+      external_source: linked ? "openlibrary" : null,
+      external_id: linked ? work : null,
+      title: d.title,
+      description: olDescription(d.description),
+      image_url: d.covers?.[0] > 0 ? `https://covers.openlibrary.org/b/id/${d.covers[0]}-L.jpg` : null,
+      category: (d.subjects || []).filter((s) => typeof s === "string").slice(0, 5),
+      year: d.publish_date?.match(/\d{4}/)?.[0] ?? null,
+    };
+  });
+}
+
+/**
+ * cover, genre dan id eksternal untuk banyak judul sekaligus. hasil null = tidak ketemu
+ * items: movie → { title, year }, anime / manga → { mal_id }, book → { isbn }
+ */
+export async function matchExternal(kind, items) {
+  if (kind === "movie") return mapLimit(items, 5, matchMovie);
+  if (kind === "anime" || kind === "manga") return matchMal(items, kind);
+  if (kind === "book") return matchBooks(items);
+  throw new Error(`kind tidak dikenal: ${kind}`);
+}

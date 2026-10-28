@@ -30,6 +30,7 @@ export const validateMedia = (body, { isNew = false } = {}) => {
     source,
     type,
     last_episode,
+    season,
     rating,
     is_completed,
     external_source,
@@ -67,6 +68,7 @@ export const validateMedia = (body, { isNew = false } = {}) => {
   ) {
     return "last_episode tidak valid";
   }
+  if (season != null && !isValidSeason(season)) return "season harus 1 - 1000";
   if (rating != null && !isValidRating(rating)) return "rating harus 0 - 5";
   if (is_completed !== undefined && typeof is_completed !== "boolean") {
     return "is_completed harus boolean";
@@ -86,6 +88,9 @@ export const validateName = ({ fullname, username }) => {
   if (!isText(username, 50) || !username.trim()) return "username wajib diisi (max 50 karakter)";
   return null;
 };
+
+export const isValidSeason = (season) =>
+  Number.isInteger(Number(season)) && season >= 1 && season <= 1000;
 
 export const isValidRating = (rating) => {
   const n = parseFloat(rating);

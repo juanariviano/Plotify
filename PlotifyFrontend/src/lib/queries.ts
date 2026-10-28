@@ -21,6 +21,7 @@ export const mediaKeys = {
     ["media", uid, "list", type, isCompleted, search] as const,
   item: (uid: Uid, id: number) => ["media", uid, "item", id] as const,
   stats: (uid: Uid) => ["media", uid, "stats"] as const,
+  recap: (uid: Uid, year: number) => ["media", uid, "recap", year] as const,
 };
 
 type ListParams = { type: Shelf; isCompleted: boolean; search?: string; pageSize?: number };

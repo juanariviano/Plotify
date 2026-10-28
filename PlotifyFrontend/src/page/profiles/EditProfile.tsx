@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "motion/react";
-import { ImageUp, Lock, RotateCcw } from "lucide-react";
+import { Crop, ImageUp, Lock, RotateCcw } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
@@ -16,11 +16,13 @@ import Footer from "../../components/ui/Footer";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import Modal from "../../components/ui/Modal";
 import OtpInput from "../../components/ui/OtpInput";
+import ImageCropper from "../../components/ui/ImageCropper";
 import { FormError } from "../../components/auth/AuthLayout";
 import { easeOut, fadeUp, stagger } from "../../lib/motion";
 import { btn } from "../../lib/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "../../hooks/useProfile";
+import { useFileDrop } from "../../hooks/useFileDrop";
 
 const SECTIONS = [
   { id: "profile", label: "profile" },
@@ -82,14 +84,33 @@ const EditProfile = () => {
     setOldEmail(profile.email);
   }, [profile]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    const selected = e.target.files?.[0];
-    if (!selected) return;
+  // a new photo goes through the cropper first; the original is kept so the crop can be adjusted
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const { dragging, dropProps } = useFileDrop(setCropFile);
 
-    setFile(selected);
+  const applyCrop = (cropped: File) => {
+    setError(null);
+    setSourceFile(cropFile);
+    setFile(cropped);
     setDelProfilePic(false);
-    setPreview(URL.createObjectURL(selected));
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(URL.createObjectURL(cropped));
+    setCropFile(null);
+  };
+
+  const keepCurrentPhoto = () => {
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setFile(null);
+    setSourceFile(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected?.type.startsWith("image/")) setCropFile(selected);
+    // lets the same file be picked again after cancelling the cropper
+    e.target.value = "";
   };
 
   const [editLoading, setEditLoading] = useState(false);
@@ -334,7 +355,12 @@ const EditProfile = () => {
                   <h2 className="mb-1 font-serif text-[26px]">profile</h2>
                   <p className="mb-6 text-sm text-muted">how your name appears around plotify.</p>
 
-                  <div className="mb-6 flex flex-wrap items-center gap-4">
+                  <div
+                    {...dropProps}
+                    className={`-m-3 mb-3 flex flex-wrap items-center gap-4 border border-dashed p-3 transition-colors ${
+                      dragging ? "border-accent bg-accent-soft" : "border-transparent"
+                    }`}
+                  >
                     <label
                       htmlFor="fileInput"
                       className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden bg-[#3b4a3f] font-serif text-4xl text-white"
@@ -356,7 +382,11 @@ const EditProfile = () => {
                           </motion.span>
                         )}
                       </AnimatePresence>
-                      <span className="absolute inset-0 flex items-center justify-center bg-ink/55 opacity-0 transition-opacity group-hover:opacity-100">
+                      <span
+                        className={`absolute inset-0 flex items-center justify-center bg-ink/55 transition-opacity group-hover:opacity-100 ${
+                          dragging ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
                         <ImageUp size={20} />
                       </span>
                       <input
@@ -371,6 +401,16 @@ const EditProfile = () => {
                     <label htmlFor="fileInput" className={btn("secondary", "md", "cursor-pointer")}>
                       upload new photo
                     </label>
+                    {file && sourceFile && (
+                      <button type="button" className={btn("ghost", "md")} onClick={() => setCropFile(sourceFile)}>
+                        <Crop size={14} /> adjust
+                      </button>
+                    )}
+                    {file && (
+                      <button type="button" className={btn("ghost", "md")} onClick={keepCurrentPhoto}>
+                        <RotateCcw size={14} /> {currImage ? "keep current photo" : "no photo"}
+                      </button>
+                    )}
                     {currImage && !file && (
                       <button
                         type="button"
@@ -382,11 +422,21 @@ const EditProfile = () => {
                             <RotateCcw size={14} /> keep photo
                           </>
                         ) : (
-                          "remove"
+                          "use default"
                         )}
                       </button>
                     )}
+                    <span className="text-xs text-muted">{dragging ? "drop to use this photo" : "or drag a photo here"}</span>
                   </div>
+
+                  <ImageCropper
+                    file={cropFile}
+                    aspect={1}
+                    outputWidth={400}
+                    title="frame your photo"
+                    onCancel={() => setCropFile(null)}
+                    onDone={applyCrop}
+                  />
 
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
