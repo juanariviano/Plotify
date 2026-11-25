@@ -102,7 +102,7 @@ const Navbar = () => {
                 <Sparkles size={15} /> recap {recapYear}
               </Link>
             )}
-            <Link to={`/add?item=${shelf}`} className={btn("primary", "md")}>
+            <Link to={`/add?item=${shelf}`} className={btn("primary", "md")} {...prefetch(`/add?item=${shelf}`)}>
               <Plus size={16} strokeWidth={2.4} />
               add
             </Link>
@@ -110,10 +110,10 @@ const Navbar = () => {
           </div>
         ) : (
           <div className="hidden items-center gap-5 sm:flex">
-            <Link to="/signin" className="text-sm text-ink transition-colors hover:text-accent">
+            <Link to="/signin" className="text-sm text-ink transition-colors hover:text-accent" {...prefetch("/signin")}>
               sign in
             </Link>
-            <Link to="/signup" className={btn("primary", "md")}>
+            <Link to="/signup" className={btn("primary", "md")} {...prefetch("/signup")}>
               start your shelf
             </Link>
           </div>

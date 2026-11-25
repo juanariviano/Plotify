@@ -770,7 +770,8 @@ const Card = () => {
 
       <Modal
         open={showComplete}
-        onClose={() => !busy && setShowComplete(false)}
+        onClose={() => setShowComplete(false)}
+        dismissDisabled={busy}
         title={seasons.length > 1 ? `finished ${unit.part} ${season}?` : "finished it?"}
       >
         <p className="mb-5 text-sm text-muted">
@@ -808,7 +809,7 @@ const Card = () => {
         </div>
       </Modal>
 
-      <Modal open={showUncomplete} onClose={() => !busy && setShowUncomplete(false)} title="back to in progress?">
+      <Modal open={showUncomplete} onClose={() => setShowUncomplete(false)} dismissDisabled={busy} title="back to in progress?">
         <p className="mb-7 text-sm text-muted">it returns to your {item.type} shelf. your ratings are kept.</p>
         <div className="flex gap-3">
           <button type="button" className={btn("primary", "lg")} onClick={confirmUncomplete} disabled={busy}>
@@ -820,7 +821,7 @@ const Card = () => {
         </div>
       </Modal>
 
-      <Modal open={rewatchFrom !== null} onClose={() => !busy && setRewatchFrom(null)} title={`start a ${unit.again}?`}>
+      <Modal open={rewatchFrom !== null} onClose={() => setRewatchFrom(null)} dismissDisabled={busy} title={`start a ${unit.again}?`}>
         {finishedSeasons.length > 1 && (
           <fieldset className="mb-5">
             <legend className="label">start from</legend>
@@ -862,7 +863,7 @@ const Card = () => {
         </div>
       </Modal>
 
-      <Modal open={showSeason} onClose={() => !busy && setShowSeason(false)} title={`on to ${unit.part} ${season + 1}?`}>
+      <Modal open={showSeason} onClose={() => setShowSeason(false)} dismissDisabled={busy} title={`on to ${unit.part} ${season + 1}?`}>
         <p className="mb-5 text-sm text-muted">
           {unit.part} {season} is marked finished and stays on the list.{" "}
           {nextExisting
@@ -932,7 +933,7 @@ const Card = () => {
         </button>
       </Modal>
 
-      <Modal open={showDelete} onClose={() => !busy && setShowDelete(false)} title="delete this title?" tone="danger">
+      <Modal open={showDelete} onClose={() => setShowDelete(false)} dismissDisabled={busy} title="delete this title?" tone="danger">
         <p className="mb-7 text-sm text-muted">
           “{item.title}” and its cover will be removed from your shelf. this can't be undone.
         </p>
@@ -940,7 +941,7 @@ const Card = () => {
           <button type="button" className={btn("danger", "lg")} onClick={handleDelete} disabled={busy}>
             {busy ? "deleting…" : "delete"}
           </button>
-          <button type="button" className={btn("secondary", "lg")} onClick={() => setShowDelete(false)} disabled={busy}>
+          <button type="button" data-autofocus className={btn("secondary", "lg")} onClick={() => setShowDelete(false)} disabled={busy}>
             keep it
           </button>
         </div>

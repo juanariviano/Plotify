@@ -1,51 +1,36 @@
 import { Routes, Route, Navigate } from "react-router";
-import { lazy, Suspense, useEffect, type ComponentType } from "react";
+import { SignedIn } from "@clerk/clerk-react";
+import { lazy, Suspense } from "react";
 import { ProtectedRoute, PublicRoute } from "./components/AuthRoutes";
 import { useCacheGuard } from "./hooks/useCacheGuard";
 import LoadingScreen from "./components/ui/LoadingScreen";
+import { routeLoaders } from "./lib/routeLoaders";
 import Home from "./page/menus/Home";
 
-// every page except the landing one is its own chunk, so the first load stays small
-const pages: (() => Promise<unknown>)[] = [];
-const page = <T extends ComponentType>(load: () => Promise<{ default: T }>) => {
-  pages.push(load);
-  return lazy(load);
-};
-
-const Screen = page(() => import("./page/menus/Screen"));
-const Read = page(() => import("./page/menus/Read"));
-const Profile = page(() => import("./page/profiles/Profile"));
-const Card = page(() => import("./page/menus/Card"));
-const Add = page(() => import("./page/menus/Add"));
-const AddBulk = page(() => import("./page/menus/AddBulk"));
-const Import = page(() => import("./page/menus/Import"));
-const Recap = page(() => import("./page/recap/Recap"));
-const Donate = page(() => import("./page/menus/Donate"));
-const ChatWidget = page(() => import("./components/chat/ChatWidget"));
-const FeedbackPrompt = page(() => import("./components/feedback/FeedbackPrompt"));
-const Signin = page(() => import("./page/auth/Signin"));
-const Signup = page(() => import("./page/auth/Signup"));
-const Forgot = page(() => import("./page/auth/Forgot"));
-const Reset = page(() => import("./page/auth/Reset"));
-const ChangePassword = page(() => import("./page/auth/ChangePassword"));
-const EditProfile = page(() => import("./page/profiles/EditProfile"));
-const VerifySignup = page(() => import("./page/auth/VerifySignup"));
-const Page404 = page(() => import("./page/error/page404"));
-const Page500 = page(() => import("./page/error/page500"));
-const SsoCallback = page(() => import("./components/auth/SsoCallback"));
-
-// once the current page is up, fetch the other chunks quietly so later
-// navigation never waits on the network
-const preloadPages = () => {
-  const run = () => pages.forEach((load) => void load().catch(() => {}));
-  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 3000 });
-  else setTimeout(run, 1500);
-};
+const Screen = lazy(routeLoaders["/screen"]);
+const Read = lazy(routeLoaders["/read"]);
+const Profile = lazy(routeLoaders["/profile"]);
+const Card = lazy(() => import("./page/menus/Card"));
+const Add = lazy(routeLoaders["/add"]);
+const AddBulk = lazy(() => import("./page/menus/AddBulk"));
+const Import = lazy(() => import("./page/menus/Import"));
+const Recap = lazy(() => import("./page/recap/Recap"));
+const Donate = lazy(() => import("./page/menus/Donate"));
+const ChatWidget = lazy(() => import("./components/chat/ChatWidget"));
+const FeedbackPrompt = lazy(() => import("./components/feedback/FeedbackPrompt"));
+const Signin = lazy(routeLoaders["/signin"]);
+const Signup = lazy(routeLoaders["/signup"]);
+const Forgot = lazy(() => import("./page/auth/Forgot"));
+const Reset = lazy(() => import("./page/auth/Reset"));
+const ChangePassword = lazy(() => import("./page/auth/ChangePassword"));
+const EditProfile = lazy(() => import("./page/profiles/EditProfile"));
+const VerifySignup = lazy(() => import("./page/auth/VerifySignup"));
+const Page404 = lazy(() => import("./page/error/page404"));
+const Page500 = lazy(() => import("./page/error/page500"));
+const SsoCallback = lazy(() => import("./components/auth/SsoCallback"));
 
 function App() {
   useCacheGuard();
-
-  useEffect(preloadPages, []);
 
   return (
     <>
@@ -176,10 +161,14 @@ function App() {
           <Route path="*" element={<Page404 />} />
         </Routes>
       </Suspense>
-      <Suspense fallback={null}>
-        <ChatWidget />
-        <FeedbackPrompt />
-      </Suspense>
+      <SignedIn>
+        <Suspense fallback={null}>
+          <ChatWidget />
+        </Suspense>
+        <Suspense fallback={null}>
+          <FeedbackPrompt />
+        </Suspense>
+      </SignedIn>
     </>
   );
 }

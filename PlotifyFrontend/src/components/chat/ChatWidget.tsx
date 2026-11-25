@@ -47,7 +47,7 @@ const ChatWidget = () => {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !document.querySelector("dialog:modal")) {
         setOpen(false);
         launcherRef.current?.focus();
       }

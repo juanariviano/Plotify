@@ -555,7 +555,8 @@ const EditProfile = () => {
 
       <Modal
         open={confirmationDelete}
-        onClose={() => !deleteLoading && setConfirmationDelete(false)}
+        onClose={() => setConfirmationDelete(false)}
+        dismissDisabled={deleteLoading}
         title="delete your account?"
         tone="danger"
       >
@@ -566,7 +567,7 @@ const EditProfile = () => {
           <button type="button" className={btn("danger", "lg")} onClick={handleDeleteAccount} disabled={deleteLoading}>
             yes, delete everything
           </button>
-          <button type="button" className={btn("secondary", "lg")} onClick={() => setConfirmationDelete(false)}>
+          <button type="button" data-autofocus className={btn("secondary", "lg")} onClick={() => setConfirmationDelete(false)}>
             keep my account
           </button>
         </div>

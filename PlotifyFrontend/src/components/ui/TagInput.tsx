@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type TagInputProps = {
   id?: string;
@@ -12,6 +12,7 @@ type TagInputProps = {
 // categories as chips: enter or comma adds one, backspace on empty removes the last
 const TagInput = ({ id, value, onChange, placeholder = "type and press enter" }: TagInputProps) => {
   const [draft, setDraft] = useState("");
+  const composing = useRef(false);
 
   const commit = (raw: string) => {
     const parts = raw
@@ -52,16 +53,21 @@ const TagInput = ({ id, value, onChange, placeholder = "type and press enter" }:
         id={id}
         type="text"
         value={draft}
+        onCompositionStart={() => { composing.current = true; }}
+        onCompositionEnd={() => { composing.current = false; }}
         onChange={(e) => {
           const next = e.target.value;
-          if (next.includes(",")) commit(next);
+          if (!composing.current && next.includes(",")) commit(next);
           else setDraft(next);
         }}
         onKeyDown={(e) => {
+          const isComposing = composing.current || e.nativeEvent.isComposing;
           if (e.key === "Enter") {
             e.preventDefault();
+            // Some Safari versions report Enter after compositionend.
+            if (isComposing || e.nativeEvent.keyCode === 229) return;
             commit(draft);
-          } else if (e.key === "Backspace" && !draft && value.length) {
+          } else if (e.key === "Backspace" && !isComposing && !draft && value.length) {
             onChange(value.slice(0, -1));
           }
         }}

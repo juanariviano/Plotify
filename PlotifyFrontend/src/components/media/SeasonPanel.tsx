@@ -316,7 +316,7 @@ const SeasonPanel = ({ item, onChange, onRewatch }: SeasonPanelProps) => {
 
       {error && !showAdd && rateFor === null && <p className="mt-3 text-sm text-danger">{error}</p>}
 
-      <Modal open={showAdd} onClose={() => !busy && setShowAdd(false)} title={`add a ${unit.part}`}>
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} dismissDisabled={busy} title={`add a ${unit.part}`}>
         <p className="mb-5 text-sm text-muted">for one you've already {item.type === "screen" ? "watched" : "read"}, or one you skipped.</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -378,7 +378,8 @@ const SeasonPanel = ({ item, onChange, onRewatch }: SeasonPanelProps) => {
 
       <Modal
         open={showDelete}
-        onClose={() => !busy && setShowDelete(false)}
+        onClose={() => setShowDelete(false)}
+        dismissDisabled={busy}
         title={`delete ${unit.part} ${current.season}?`}
         tone="danger"
       >
@@ -394,7 +395,7 @@ const SeasonPanel = ({ item, onChange, onRewatch }: SeasonPanelProps) => {
           >
             {busy ? "deleting…" : "delete"}
           </button>
-          <button type="button" className={btn("secondary", "lg")} onClick={() => setShowDelete(false)} disabled={busy}>
+          <button type="button" data-autofocus className={btn("secondary", "lg")} onClick={() => setShowDelete(false)} disabled={busy}>
             keep it
           </button>
         </div>
@@ -402,7 +403,8 @@ const SeasonPanel = ({ item, onChange, onRewatch }: SeasonPanelProps) => {
 
       <Modal
         open={rateFor !== null}
-        onClose={() => !busy && setRateFor(null)}
+        onClose={() => setRateFor(null)}
+        dismissDisabled={busy}
         title={
           !rateFor?.finish
             ? `rate ${unit.part} ${rateFor?.season}`

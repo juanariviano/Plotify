@@ -1,5 +1,15 @@
+# Local coding tools
 .agents/
-skills-lock.json
-.vite/
-.DS_Store
 .claude/
+skills-lock.json
+
+# Local environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Generated caches and OS files
+.vite/
+*.tsbuildinfo
+.eslintcache
+.DS_Store

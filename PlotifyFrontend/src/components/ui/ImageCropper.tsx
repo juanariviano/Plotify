@@ -70,7 +70,7 @@ const ImageCropper = ({
   const nudge = (delta: number) => setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z + delta)));
 
   return (
-    <Modal open={!!file} onClose={() => !busy && onCancel()} title={title}>
+    <Modal open={!!file} onClose={onCancel} dismissDisabled={busy} title={title}>
       <p className="mb-4 text-sm text-muted">drag to move it, scroll or pinch to zoom.</p>
 
       <div className="relative h-[320px] w-full overflow-hidden bg-ink">

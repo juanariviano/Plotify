@@ -86,7 +86,12 @@ const FeedbackPrompt = () => {
   if (!isSignedIn) return null;
 
   return (
-    <Modal open={open} onClose={dismiss} title={sent ? "thank you." : previous ? "update your rating" : "enjoying plotify?"}>
+    <Modal
+      open={open}
+      onClose={dismiss}
+      dismissDisabled={send.isPending}
+      title={sent ? "thank you." : previous ? "update your rating" : "enjoying plotify?"}
+    >
       <AnimatePresence mode="wait" initial={false}>
         {sent ? (
           <motion.div key="sent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
